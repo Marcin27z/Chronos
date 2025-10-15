@@ -1,94 +1,120 @@
-# 10x Astro Starter
+# Chronos - Cykliczne Zadania
 
-A modern, opinionated starter template for building fast, accessible, and AI-friendly web applications.
+A minimalist web application (MVP) designed to help users manage rarely recurring tasks and obligations. The main goal of the product is to solve the specific problem of forgetting about activities that need to be performed at long, irregular intervals (e.g., every few months or once a year).
+
+## Project Description
+
+Chronos focuses on simplicity, clarity, and handling one key task: reliable reminders for recurring obligations. It's a tool designed for individual users to manage mainly household and personal tasks.
+
+The application addresses the problem where users have difficulty remembering tasks that are not part of their daily routine. Standard tools like calendars or to-do applications often don't work well in this context, as calendars can be cluttered with meetings, causing household task notifications to get lost in the information overload.
 
 ## Tech Stack
 
-- [Astro](https://astro.build/) v5.5.5 - Modern web framework for building fast, content-focused websites
-- [React](https://react.dev/) v19.0.0 - UI library for building interactive components
-- [TypeScript](https://www.typescriptlang.org/) v5 - Type-safe JavaScript
-- [Tailwind CSS](https://tailwindcss.com/) v4.0.17 - Utility-first CSS framework
+### Frontend
+- **[Astro 5](https://astro.build/)** - Fast, efficient pages and applications with minimal JavaScript
+- **[React 19](https://react.dev/)** - Interactive components where needed
+- **[TypeScript 5](https://www.typescriptlang.org/)** - Static typing and better IDE support
+- **[Tailwind 4](https://tailwindcss.com/)** - Utility-first CSS framework for styling
+- **[Shadcn/ui](https://ui.shadcn.com/)** - Accessible React component library
 
-## Prerequisites
+### Backend
+- **[Supabase](https://supabase.com/)** - Complete backend solution providing:
+  - PostgreSQL database
+  - Multi-language SDK as Backend-as-a-Service
+  - Built-in user authentication
+  - Open source solution with self-hosting options
 
-- Node.js v22.14.0 (as specified in `.nvmrc`)
-- npm (comes with Node.js)
+### AI Integration
+- **[Openrouter.ai](https://openrouter.ai/)** - Access to various AI models (OpenAI, Anthropic, Google, etc.)
+  - Cost-effective solution with API key financial limits
+  - Wide range of models for optimal efficiency
 
-## Getting Started
+### CI/CD & Hosting
+- **[GitHub Actions](https://github.com/features/actions)** - CI/CD pipeline creation
+- **[DigitalOcean](https://www.digitalocean.com/)** - Application hosting via Docker containers
+
+## Getting Started Locally
+
+### Prerequisites
+- Node.js 22.14.0 (see `.nvmrc`)
+- npm or yarn package manager
+
+### Installation
 
 1. Clone the repository:
-
 ```bash
-git clone https://github.com/przeprogramowani/10x-astro-starter.git
-cd 10x-astro-starter
+git clone <repository-url>
+cd chronos
 ```
 
 2. Install dependencies:
-
 ```bash
 npm install
 ```
 
-3. Run the development server:
+3. Set up environment variables:
+```bash
+# Create .env file with required Supabase and Openrouter.ai configuration
+# (Environment variables configuration details to be added)
+```
 
+4. Start the development server:
 ```bash
 npm run dev
 ```
 
-4. Build for production:
-
-```bash
-npm run build
-```
+5. Open your browser and navigate to `http://localhost:4321`
 
 ## Available Scripts
 
 - `npm run dev` - Start development server
 - `npm run build` - Build for production
-- `npm run preview` - Preview production build
+- `npm run preview` - Preview production build locally
+- `npm run astro` - Run Astro CLI commands
 - `npm run lint` - Run ESLint
-- `npm run lint:fix` - Fix ESLint issues
+- `npm run lint:fix` - Fix ESLint issues automatically
+- `npm run format` - Format code with Prettier
 
-## Project Structure
+## Project Scope
 
-```md
-.
-├── src/
-│   ├── layouts/    # Astro layouts
-│   ├── pages/      # Astro pages
-│   │   └── api/    # API endpoints
-│   ├── components/ # UI components (Astro & React)
-│   └── assets/     # Static assets
-├── public/         # Public assets
-```
+### MVP Features
+- **User Account Management**: Registration, email verification, login/logout, password recovery, account deletion
+- **Task Management (CRUD)**: Create, read, update, delete tasks with titles and descriptions
+- **Scheduling System**: Set recurrence intervals (days, weeks, months, years) with optional weekday enforcement
+- **Dashboard Interface**: Overview of overdue and upcoming tasks (next 7 days)
+- **Task Lifecycle**: Mark tasks as completed or skipped, automatic next occurrence calculation
+- **Onboarding**: Suggested task templates for new users
+- **Help System**: FAQ and task suggestions
 
-## AI Development Support
+### Out of Scope (Post-MVP)
+- External calendar integrations (Google Calendar, Outlook)
+- Native mobile applications (iOS, Android)
+- Notification systems (email, push, SMS)
+- Snooze functionality
+- Task attachments
+- Task sharing and team collaboration
+- Advanced recurrence options
 
-This project is configured with AI development tools to enhance the development experience, providing guidelines for:
+## Project Status
 
-- Project structure
-- Coding practices
-- Frontend development
-- Styling with Tailwind
-- Accessibility best practices
-- Astro and React guidelines
+**Current Status**: MVP in development
 
-### Cursor IDE
+### Success Metrics
+- **Activation**: >40% of newly registered users create at least 5 tasks within 7 days of registration
+- **Engagement**: >70% of overdue tasks are marked as "completed" or "skipped" monthly
+- **Retention**: User return rates after 7 days (short-term) and 30 days (long-term) from registration
 
-The project includes AI rules in `.cursor/rules/` directory that help Cursor IDE understand the project structure and provide better code suggestions.
-
-### GitHub Copilot
-
-AI instructions for GitHub Copilot are available in `.github/copilot-instructions.md`
-
-### Windsurf
-
-The `.windsurfrules` file contains AI configuration for Windsurf.
-
-## Contributing
-
-Please follow the AI guidelines and coding practices defined in the AI configuration files when contributing to this project.
+### User Stories
+The project implements 15 core user stories (US-001 to US-015) covering:
+- User registration and authentication
+- Task management operations
+- Dashboard functionality
+- Help and account management
 
 ## License
 
-MIT
+[License information to be added]
+
+---
+
+For detailed product requirements and user stories, see the [Product Requirements Document](.ai/prd.md).
