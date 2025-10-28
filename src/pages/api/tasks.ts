@@ -1,6 +1,8 @@
 import type { APIRoute } from "astro";
+import type { User } from "@supabase/supabase-js";
 import { z } from "zod";
-import type { CreateTaskCommand, TaskDTO, ValidationErrorDTO, ErrorDTO } from "../../types";
+import type { CreateTaskCommand, TaskDTO, TaskListDTO, ValidationErrorDTO, ErrorDTO } from "../../types";
+import type { SupabaseClient } from "../../db/supabase.client";
 import { TaskService } from "../../lib/services/task.service";
 
 /**
@@ -48,6 +50,107 @@ const CreateTaskSchema = z.object({
 });
 
 /**
+ * Zod validation schema for GET /api/tasks query parameters
+ * Mirrors the expected query parameters with runtime validation rules
+ */
+const GetTasksQuerySchema = z.object({
+  sort: z.enum(["next_due_date", "-next_due_date", "title", "-title"]).optional().default("next_due_date"),
+
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1, "Limit must be at least 1")
+    .max(100, "Limit must not exceed 100")
+    .optional()
+    .default(50),
+
+  offset: z.coerce.number().int().min(0, "Offset must be non-negative").optional().default(0),
+});
+
+/**
+ * Type alias for validated GET /api/tasks query parameters
+ * Automatically inferred from the Zod schema for type safety
+ */
+type GetTasksQuery = z.infer<typeof GetTasksQuerySchema>;
+
+/**
+ * Authentication helper function for API endpoints
+ *
+ * @param request - Astro API request object
+ * @param supabase - Supabase client instance
+ * @returns Promise resolving to either { user, errorResponse: null } on success
+ *         or { user: null, errorResponse } on failure
+ */
+async function authenticateUser(
+  request: Request,
+  supabase: SupabaseClient
+): Promise<{ user: User | null; errorResponse: Response | null }> {
+  // Check for Authorization header
+  const authHeader = request.headers.get("authorization");
+
+  if (!authHeader) {
+    return {
+      user: null,
+      errorResponse: new Response(
+        JSON.stringify({
+          error: "Authorization header is missing",
+        } satisfies ErrorDTO),
+        {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        }
+      ),
+    };
+  }
+
+  // Extract Bearer token
+  const token = authHeader.replace(/^Bearer\s+/i, "");
+
+  if (!token || token === authHeader) {
+    return {
+      user: null,
+      errorResponse: new Response(
+        JSON.stringify({
+          error: "Authorization header must use Bearer token format",
+        } satisfies ErrorDTO),
+        {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        }
+      ),
+    };
+  }
+
+  // Validate token with Supabase
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser(token);
+
+  if (authError || !user) {
+    return {
+      user: null,
+      errorResponse: new Response(
+        JSON.stringify({
+          error: "Invalid or expired token",
+        } satisfies ErrorDTO),
+        {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        }
+      ),
+    };
+  }
+
+  // Success case
+  return {
+    user,
+    errorResponse: null,
+  };
+}
+
+/**
  * POST /api/tasks
  *
  * Creates a new recurring task for the authenticated user
@@ -80,47 +183,14 @@ export const POST: APIRoute = async ({ request, locals }) => {
       );
     }
 
-    // // ==========================================
-    // // 2. Authentication
-    // // ==========================================
-    const authHeader = request.headers.get("authorization");
-
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({
-          error: "Authentication required",
-          details: "Authorization header is missing",
-        } satisfies ErrorDTO),
-        {
-          status: 401,
-          headers: { "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    // // Extract Bearer token
-    const token = authHeader.replace(/^Bearer\s+/i, "");
-
-    if (!token || token === authHeader) {
-      return new Response(
-        JSON.stringify({
-          error: "Invalid authentication",
-          details: "Authorization header must use Bearer token format",
-        } satisfies ErrorDTO),
-        {
-          status: 401,
-          headers: { "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    // // Validate token with Supabase
+    // ==========================================
+    // 2. Authentication
+    // ==========================================
     const supabase = locals.supabase;
     if (!supabase) {
       return new Response(
         JSON.stringify({
-          error: "Internal server error",
-          details: "Database client not available",
+          error: "Database client not available",
         } satisfies ErrorDTO),
         {
           status: 500,
@@ -129,19 +199,20 @@ export const POST: APIRoute = async ({ request, locals }) => {
       );
     }
 
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser(token);
+    const { user, errorResponse: authErrorResponse } = await authenticateUser(request, supabase);
 
-    if (authError || !user) {
+    if (authErrorResponse) {
+      return authErrorResponse;
+    }
+
+    if (!user) {
+      // This shouldn't happen if errorResponse is null, but TypeScript requires it
       return new Response(
         JSON.stringify({
           error: "Authentication failed",
-          details: "Invalid or expired token",
         } satisfies ErrorDTO),
         {
-          status: 401,
+          status: 500,
           headers: { "Content-Type": "application/json" },
         }
       );
@@ -154,7 +225,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
 
     try {
       requestBody = await request.json();
-    } catch (error) {
+    } catch {
       return new Response(
         JSON.stringify({
           error: "Invalid JSON",
@@ -215,6 +286,124 @@ export const POST: APIRoute = async ({ request, locals }) => {
       JSON.stringify({
         error: "Internal server error",
         details: "An unexpected error occurred while creating the task",
+      } satisfies ErrorDTO),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  }
+};
+
+/**
+ * GET /api/tasks
+ *
+ * Retrieves a paginated list of recurring tasks for the authenticated user
+ *
+ * @requires Authentication via Bearer token
+ *
+ * @param request - Astro API request containing optional query parameters
+ * @returns 200 OK with TaskListDTO on success
+ * @returns 400 Bad Request on validation error
+ * @returns 401 Unauthorized on authentication failure
+ * @returns 500 Internal Server Error on unexpected errors
+ */
+export const GET: APIRoute = async ({ request, locals }) => {
+  try {
+    // ==========================================
+    // 1. Authentication
+    // ==========================================
+    const supabase = locals.supabase;
+    if (!supabase) {
+      return new Response(
+        JSON.stringify({
+          error: "Database client not available",
+        } satisfies ErrorDTO),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    const { user, errorResponse: authErrorResponse } = await authenticateUser(request, supabase);
+
+    if (authErrorResponse) {
+      return authErrorResponse;
+    }
+
+    if (!user) {
+      // This shouldn't happen if errorResponse is null, but TypeScript requires it
+      return new Response(
+        JSON.stringify({
+          error: "Authentication failed",
+        } satisfies ErrorDTO),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // ==========================================
+    // 2. Extract and Validate Query Parameters
+    // ==========================================
+    const url = new URL(request.url);
+    const queryParams = {
+      sort: url.searchParams.get("sort") ?? undefined,
+      limit: url.searchParams.get("limit") ?? undefined,
+      offset: url.searchParams.get("offset") ?? undefined,
+    };
+
+    const validationResult = GetTasksQuerySchema.safeParse(queryParams);
+
+    if (!validationResult.success) {
+      // Transform Zod errors to ValidationErrorDTO format
+      const validationErrors: ValidationErrorDTO = {
+        error: "Validation failed",
+        details: validationResult.error.errors.map((err) => ({
+          field: err.path.join(".") || "unknown",
+          message: err.message,
+        })),
+      };
+
+      return new Response(JSON.stringify(validationErrors), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    const validatedQuery: GetTasksQuery = validationResult.data;
+
+    // ==========================================
+    // 3. Business Logic - Retrieve Tasks
+    // ==========================================
+    const taskService = new TaskService(supabase);
+    const taskList: TaskListDTO = await taskService.getTasks(
+      user.id,
+      validatedQuery.sort,
+      validatedQuery.limit,
+      validatedQuery.offset
+    );
+
+    // ==========================================
+    // 4. Success Response
+    // ==========================================
+    return new Response(JSON.stringify(taskList), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (error) {
+    // ==========================================
+    // 5. Error Handling - Unexpected Errors
+    // ==========================================
+    // Log error details for debugging (in production, use proper logging service)
+    console.error("Error retrieving tasks:", error);
+
+    // Return generic error to client (don't expose internal details)
+    return new Response(
+      JSON.stringify({
+        error: "An unexpected error occurred while retrieving tasks",
       } satisfies ErrorDTO),
       {
         status: 500,

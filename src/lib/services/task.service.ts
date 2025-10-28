@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "../../db/supabase.client";
-import type { CreateTaskCommand, TaskDTO } from "../../types";
+import type { CreateTaskCommand, TaskDTO, TaskListDTO, PaginationDTO } from "../../types";
 
 /**
  * Task Service
@@ -52,6 +52,69 @@ export class TaskService {
     }
 
     return data as TaskDTO;
+  }
+
+  /**
+   * Retrieves a paginated list of tasks for the authenticated user with optional sorting
+   *
+   * @param userId - ID of the authenticated user
+   * @param sort - Sort field and direction ('next_due_date', '-next_due_date', 'title', '-title')
+   * @param limit - Maximum number of tasks to return (1-100)
+   * @param offset - Number of tasks to skip (≥0)
+   * @returns TaskListDTO with tasks data and pagination metadata
+   * @throws Error if database query fails
+   */
+  async getTasks(
+    userId: string,
+    sort: "next_due_date" | "-next_due_date" | "title" | "-title",
+    limit: number,
+    offset: number
+  ): Promise<TaskListDTO> {
+    // Parse sort parameter to determine column and direction
+    const { column, ascending } = this.parseSortParam(sort);
+
+    // Query 1: Fetch tasks with sorting and pagination
+    const query = this.supabase
+      .from("tasks")
+      .select("*")
+      .eq("user_id", userId)
+      .order(column, { ascending })
+      .range(offset, offset + limit - 1);
+
+    const { data: tasks, error: tasksError } = await query;
+
+    if (tasksError) {
+      throw new Error(`Failed to retrieve tasks: ${tasksError.message}`);
+    }
+
+    // Query 2: Count total tasks for pagination metadata
+    const { count, error: countError } = await this.supabase
+      .from("tasks")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", userId);
+
+    if (countError) {
+      throw new Error(`Failed to count tasks: ${countError.message}`);
+    }
+
+    const total = count ?? 0;
+
+    // Calculate has_more flag
+    const hasMore = offset + limit < total;
+
+    // Construct pagination metadata
+    const pagination: PaginationDTO = {
+      total,
+      limit,
+      offset,
+      has_more: hasMore,
+    };
+
+    // Return TaskListDTO with data and pagination
+    return {
+      data: (tasks as TaskDTO[]) ?? [],
+      pagination,
+    };
   }
 
   /**
@@ -163,5 +226,35 @@ export class TaskService {
     const day = String(date.getUTCDate()).padStart(2, "0");
 
     return `${year}-${month}-${day}`;
+  }
+
+  /**
+   * Parses the sort parameter to extract column name and sort direction
+   *
+   * @param sort - Sort parameter ('next_due_date', '-next_due_date', 'title', '-title')
+   * @returns Object with column name and ascending boolean flag
+   */
+  private parseSortParam(sort: "next_due_date" | "-next_due_date" | "title" | "-title"): {
+    column: string;
+    ascending: boolean;
+  } {
+    // Check if sort parameter starts with '-' (descending order)
+    const isDescending = sort.startsWith("-");
+
+    // Remove '-' prefix to get the actual column name
+    const column = isDescending ? sort.substring(1) : sort;
+
+    // Map API field names to database column names if needed
+    const columnMap: Record<string, string> = {
+      next_due_date: "next_due_date",
+      title: "title",
+    };
+
+    const dbColumn = columnMap[column] ?? "next_due_date"; // fallback to default
+
+    return {
+      column: dbColumn,
+      ascending: !isDescending,
+    };
   }
 }
