@@ -95,6 +95,28 @@ npm run dev
 - Task sharing and team collaboration
 - Advanced recurrence options
 
+## API Documentation
+
+The application provides a REST API for task management. See detailed API documentation:
+
+- **[Create Task API Examples](.ai/api-examples-create-task.md)** - Complete testing guide for POST /api/tasks endpoint
+
+### Available Endpoints
+
+#### Tasks
+- `POST /api/tasks` - Create a new recurring task
+  - **Authentication**: Required (Bearer token)
+  - **Input**: CreateTaskCommand (title, interval_value, interval_unit, description, preferred_day_of_week)
+  - **Output**: TaskDTO with calculated next_due_date
+
+For more endpoints documentation (coming soon):
+- `GET /api/tasks` - List all user tasks
+- `GET /api/tasks/:id` - Get specific task
+- `PATCH /api/tasks/:id` - Update task
+- `DELETE /api/tasks/:id` - Delete task
+- `POST /api/tasks/:id/complete` - Mark task as completed
+- `POST /api/tasks/:id/skip` - Mark task as skipped
+
 ## Project Status
 
 **Current Status**: MVP in development
