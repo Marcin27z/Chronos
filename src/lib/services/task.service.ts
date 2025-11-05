@@ -1,5 +1,15 @@
 import type { SupabaseClient } from "../../db/supabase.client";
-import type { CreateTaskCommand, TaskDTO, TaskListDTO, PaginationDTO } from "../../types";
+import type {
+  CreateTaskCommand,
+  TaskDTO,
+  TaskListDTO,
+  PaginationDTO,
+  DashboardDTO,
+  TaskWithDaysOverdueDTO,
+  TaskWithDaysUntilDueDTO,
+  NextTaskDTO,
+  DashboardSummaryDTO,
+} from "../../types";
 
 /**
  * Task Service
@@ -256,5 +266,139 @@ export class TaskService {
       column: dbColumn,
       ascending: !isDescending,
     };
+  }
+
+  /**
+   * Retrieves dashboard data for the authenticated user
+   *
+   * Includes:
+   * - Overdue tasks (next_due_date < CURRENT_DATE)
+   * - Upcoming tasks (next_due_date between CURRENT_DATE and CURRENT_DATE + 7 days)
+   * - Next task in the future (if no overdue or upcoming tasks exist)
+   * - Summary statistics
+   *
+   * @param userId - ID of the authenticated user
+   * @returns DashboardDTO with all dashboard sections
+   * @throws Error if database queries fail
+   */
+  async getDashboardData(userId: string): Promise<DashboardDTO> {
+    // Get current date in YYYY-MM-DD format
+    const currentDate = this.getCurrentDateISO();
+    const sevenDaysLater = this.getDatePlusDaysISO(currentDate, 7);
+
+    // Query overdue tasks
+    const { data: overdueData, error: overdueError } = await this.supabase
+      .from("tasks")
+      .select("*")
+      .eq("user_id", userId)
+      .lt("next_due_date", currentDate)
+      .order("next_due_date", { ascending: true });
+
+    if (overdueError) {
+      throw new Error(`Failed to retrieve overdue tasks: ${overdueError.message}`);
+    }
+
+    const overdue: TaskWithDaysOverdueDTO[] = (overdueData ?? []).map((task) => ({
+      ...task,
+      days_overdue: this.getDaysDifference(currentDate, task.next_due_date),
+    }));
+
+    // Query upcoming tasks
+    const { data: upcomingData, error: upcomingError } = await this.supabase
+      .from("tasks")
+      .select("*")
+      .eq("user_id", userId)
+      .gte("next_due_date", currentDate)
+      .lte("next_due_date", sevenDaysLater)
+      .order("next_due_date", { ascending: true });
+
+    if (upcomingError) {
+      throw new Error(`Failed to retrieve upcoming tasks: ${upcomingError.message}`);
+    }
+
+    const upcoming: TaskWithDaysUntilDueDTO[] = (upcomingData ?? []).map((task) => ({
+      ...task,
+      days_until_due: this.getDaysDifference(task.next_due_date, currentDate),
+    }));
+
+    let next_task: NextTaskDTO | null = null;
+
+    // Conditionally query next_task (only if overdue and upcoming are empty)
+    if (overdue.length === 0 && upcoming.length === 0) {
+      const { data: nextTaskData, error: nextTaskError } = await this.supabase
+        .from("tasks")
+        .select("id, title, next_due_date")
+        .eq("user_id", userId)
+        .gt("next_due_date", sevenDaysLater)
+        .order("next_due_date", { ascending: true })
+        .limit(1);
+
+      if (nextTaskError) {
+        throw new Error(`Failed to retrieve next task: ${nextTaskError.message}`);
+      }
+
+      if (nextTaskData && nextTaskData.length > 0) {
+        const task = nextTaskData[0];
+        next_task = {
+          id: task.id,
+          title: task.title,
+          next_due_date: task.next_due_date,
+          days_until_due: this.getDaysDifference(task.next_due_date, currentDate),
+        };
+      }
+    }
+
+    // Count total tasks
+    const { count, error: countError } = await this.supabase
+      .from("tasks")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", userId);
+
+    if (countError) {
+      throw new Error(`Failed to count total tasks: ${countError.message}`);
+    }
+
+    const total_tasks = count ?? 0;
+
+    // Construct DashboardDTO
+    const summary: DashboardSummaryDTO = {
+      total_overdue: overdue.length,
+      total_upcoming: upcoming.length,
+      total_tasks,
+    };
+
+    return {
+      overdue,
+      upcoming,
+      next_task,
+      summary,
+    };
+  }
+
+  /**
+   * Gets current date as ISO string (YYYY-MM-DD)
+   */
+  private getCurrentDateISO(): string {
+    const now = new Date();
+    return this.formatDateToISO(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())));
+  }
+
+  /**
+   * Adds days to a date and returns ISO string
+   */
+  private getDatePlusDaysISO(isoDate: string, days: number): string {
+    const date = new Date(isoDate);
+    date.setUTCDate(date.getUTCDate() + days);
+    return this.formatDateToISO(date);
+  }
+
+  /**
+   * Calculates difference in days between two dates
+   */
+  private getDaysDifference(laterDate: string, earlierDate: string): number {
+    const later = new Date(laterDate);
+    const earlier = new Date(earlierDate);
+    const diffTime = later.getTime() - earlier.getTime();
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   }
 }
