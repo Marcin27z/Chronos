@@ -9,6 +9,7 @@ import type {
   TaskWithDaysUntilDueDTO,
   NextTaskDTO,
   DashboardSummaryDTO,
+  ActionType,
 } from "../../types";
 
 /**
@@ -403,14 +404,15 @@ export class TaskService {
   }
 
   /**
-   * Marks a task as completed and calculates next due date
+   * Performs a task action (complete or skip) and calculates next due date
    *
    * @param userId - ID of the authenticated user
-   * @param taskId - ID of the task to complete
-   * @returns Updated task with new next_due_date
+   * @param taskId - ID of the task to act upon
+   * @param actionType - Type of action to perform ("completed" | "skipped")
+   * @returns Updated task with new next_due_date and action details
    * @throws Error if task not found, doesn't belong to user, or update fails
    */
-  async completeTask(userId: string, taskId: string): Promise<TaskDTO> {
+  async performTaskAction(userId: string, taskId: string, actionType: ActionType): Promise<TaskDTO> {
     // Step 1: Fetch task and verify ownership in single query
     const { data: task, error: fetchError } = await this.supabase
       .from("tasks")
@@ -435,7 +437,7 @@ export class TaskService {
       .from("tasks")
       .update({
         last_action_date: currentDate,
-        last_action_type: "completed" as const,
+        last_action_type: actionType,
         next_due_date: nextDueDate,
       })
       .eq("id", taskId)

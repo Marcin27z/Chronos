@@ -8,8 +8,8 @@ import { validateUUIDOrError } from "../../../../lib/utils/validation.utils";
 export const prerender = false;
 
 /**
- * POST /api/tasks/{taskId}/complete
- * Marks task as completed and calculates next due date
+ * POST /api/tasks/{taskId}/skip
+ * Marks task as skipped and calculates next due date
  */
 export const POST: APIRoute = async (context) => {
   try {
@@ -56,12 +56,12 @@ export const POST: APIRoute = async (context) => {
     }
     // taskId is now guaranteed to be a valid UUID
 
-    // Step 3: Initialize service and complete task
+    // Step 3: Initialize service and skip task
     const taskService = new TaskService(supabase);
 
-    let completedTask: TaskDTO;
+    let skippedTask: TaskDTO;
     try {
-      completedTask = await taskService.performTaskAction(user.id, taskId as string, "completed");
+      skippedTask = await taskService.performTaskAction(user.id, taskId as string, "skipped");
     } catch (error) {
       // Check if it's a "not found" error
       if (error instanceof Error && error.message.includes("not found")) {
@@ -82,18 +82,18 @@ export const POST: APIRoute = async (context) => {
     }
 
     // Step 4: Return success response
-    return new Response(JSON.stringify(completedTask satisfies TaskDTO), {
+    return new Response(JSON.stringify(skippedTask satisfies TaskDTO), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
   } catch (error) {
     // Step 5: Handle unexpected errors
-    console.error("[CompleteTask] Unexpected error:", error);
+    console.error("[SkipTask] Unexpected error:", error);
 
     return new Response(
       JSON.stringify({
         error: "Internal server error",
-        details: "Failed to complete task",
+        details: "Failed to skip task",
       } satisfies ErrorDTO),
       {
         status: 500,
