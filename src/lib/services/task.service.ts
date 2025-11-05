@@ -401,4 +401,54 @@ export class TaskService {
     const diffTime = later.getTime() - earlier.getTime();
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   }
+
+  /**
+   * Marks a task as completed and calculates next due date
+   *
+   * @param userId - ID of the authenticated user
+   * @param taskId - ID of the task to complete
+   * @returns Updated task with new next_due_date
+   * @throws Error if task not found, doesn't belong to user, or update fails
+   */
+  async completeTask(userId: string, taskId: string): Promise<TaskDTO> {
+    // Step 1: Fetch task and verify ownership in single query
+    const { data: task, error: fetchError } = await this.supabase
+      .from("tasks")
+      .select("*")
+      .eq("id", taskId)
+      .eq("user_id", userId)
+      .single();
+
+    // Step 2: Handle not found (either doesn't exist or wrong user)
+    if (fetchError || !task) {
+      throw new Error("Task not found or does not belong to user");
+    }
+
+    // Step 3: Get current date
+    const currentDate = this.getCurrentDateISO();
+
+    // Step 4: Calculate next due date from current date
+    const nextDueDate = this.calculateNextDueDate(task.interval_value, task.interval_unit, task.preferred_day_of_week);
+
+    // Step 5: Update task with atomic operation
+    const { data: updatedTask, error: updateError } = await this.supabase
+      .from("tasks")
+      .update({
+        last_action_date: currentDate,
+        last_action_type: "completed" as const,
+        next_due_date: nextDueDate,
+      })
+      .eq("id", taskId)
+      .eq("user_id", userId)
+      .select()
+      .single();
+
+    // Step 6: Handle update errors
+    if (updateError || !updatedTask) {
+      throw new Error(`Failed to update task: ${updateError?.message || "Unknown error"}`);
+    }
+
+    // Step 7: Return updated task
+    return updatedTask as TaskDTO;
+  }
 }
