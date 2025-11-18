@@ -1,3 +1,14 @@
+import { z } from "zod";
+
+/**
+ * URL parameter schema for taskId validation
+ */
+export const taskIdParamSchema = z.object({
+  taskId: z.string().uuid("Invalid task ID format. Must be a valid UUID."),
+});
+
+export type TaskIdParam = z.infer<typeof taskIdParamSchema>;
+
 /**
  * Validates if a string is a valid UUID v4
  *

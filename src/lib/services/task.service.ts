@@ -129,6 +129,29 @@ export class TaskService {
   }
 
   /**
+   * Retrieves a single task ensuring it belongs to the authenticated user
+   *
+   * @param userId - ID of the authenticated user requesting the task
+   * @param taskId - ID of the task to retrieve (UUID)
+   * @returns TaskDTO representing the requested task
+   * @throws Error when the task does not exist, belongs to another user, or the query fails
+   */
+  async getTaskById(userId: string, taskId: string): Promise<TaskDTO> {
+    const { data, error } = await this.supabase
+      .from("tasks")
+      .select("*")
+      .eq("id", taskId)
+      .eq("user_id", userId)
+      .single();
+
+    if (error || !data) {
+      throw new Error("Task not found or does not belong to user");
+    }
+
+    return data as TaskDTO;
+  }
+
+  /**
    * Calculates the next due date for a task based on interval and preferences
    *
    * Algorithm:
