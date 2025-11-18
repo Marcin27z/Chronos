@@ -555,4 +555,35 @@ export class TaskService {
     // Step 7: Return updated task
     return updatedTask as TaskDTO;
   }
+
+  /**
+   * Permanently deletes a task ensuring it belongs to the authenticated user
+   *
+   * @param userId - ID of the authenticated user
+   * @param taskId - ID of the task to delete
+   * @returns Promise<void> that resolves on successful deletion
+   * @throws Error if task not found, doesn't belong to user, or deletion fails
+   */
+  async deleteTask(userId: string, taskId: string): Promise<void> {
+    // Execute DELETE query with ownership verification
+    // Using count: "exact" to check if any rows were deleted
+    const { error, count } = await this.supabase
+      .from("tasks")
+      .delete({ count: "exact" })
+      .eq("id", taskId)
+      .eq("user_id", userId);
+
+    // Handle database errors
+    if (error) {
+      throw new Error(`Failed to delete task: ${error.message}`);
+    }
+
+    // Check if task was found and deleted (count should be 1)
+    // count === 0 means task doesn't exist or belongs to another user
+    if (count === 0) {
+      throw new Error("Task not found or does not belong to user");
+    }
+
+    // Success - task deleted, no return value needed
+  }
 }

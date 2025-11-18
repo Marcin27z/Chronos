@@ -241,3 +241,101 @@ export const PUT: APIRoute = async ({ params, locals, request }) => {
     );
   }
 };
+
+export const DELETE: APIRoute = async ({ params, locals, request }) => {
+  try {
+    // Step 1: Check Supabase client availability
+    const supabase = locals.supabase;
+
+    if (!supabase) {
+      return new Response(
+        JSON.stringify({
+          error: "Database client not available",
+        } satisfies ErrorDTO),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Step 2: Authenticate user
+    const { user, errorResponse: authErrorResponse } = await authenticateUser(request, supabase);
+
+    if (authErrorResponse) {
+      return authErrorResponse;
+    }
+
+    if (!user) {
+      return new Response(
+        JSON.stringify({
+          error: "Authentication failed",
+        } satisfies ErrorDTO),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Step 3: Validate taskId parameter
+    const taskIdValidation = taskIdParamSchema.safeParse({ taskId: params.taskId ?? "" });
+
+    if (!taskIdValidation.success) {
+      const firstError = taskIdValidation.error.errors[0];
+
+      return new Response(
+        JSON.stringify({
+          error: "Invalid task ID format",
+          ...(import.meta.env.DEV ? { details: firstError?.message ?? "taskId must be a valid UUID" } : {}),
+        } satisfies ErrorDTO),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Step 4: Delete task via service layer
+    const taskService = new TaskService(supabase);
+
+    try {
+      await taskService.deleteTask(user.id, taskIdValidation.data.taskId);
+    } catch (error) {
+      // Handle "not found" error specifically
+      if (error instanceof Error && error.message.includes("not found")) {
+        return new Response(
+          JSON.stringify({
+            error: "Task not found",
+          } satisfies ErrorDTO),
+          {
+            status: 404,
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      // Re-throw other errors to be caught by outer catch block
+      throw error;
+    }
+
+    // Step 5: Return 204 No Content on success
+    return new Response(null, {
+      status: 204,
+    });
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error("[DeleteTask] Unexpected error:", error);
+
+    return new Response(
+      JSON.stringify({
+        error: "Internal server error",
+        ...(import.meta.env.DEV && error instanceof Error ? { details: error.message } : {}),
+      } satisfies ErrorDTO),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  }
+};
