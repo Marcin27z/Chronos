@@ -10,6 +10,7 @@ import type {
   NextTaskDTO,
   DashboardSummaryDTO,
   ActionType,
+  UpdateTaskCommand,
 } from "../../types";
 
 /**
@@ -149,6 +150,84 @@ export class TaskService {
     }
 
     return data as TaskDTO;
+  }
+
+  /**
+   * Updates a task ensuring ownership and recalculating next_due_date when needed
+   *
+   * @param userId - ID of the authenticated user
+   * @param taskId - ID of the task to update
+   * @param command - Update payload with optional fields
+   * @returns Updated task record
+   * @throws Error when task not found or database update fails
+   */
+  async updateTask(userId: string, taskId: string, command: UpdateTaskCommand): Promise<TaskDTO> {
+    const { data: existingTask, error: fetchError } = await this.supabase
+      .from("tasks")
+      .select("*")
+      .eq("id", taskId)
+      .eq("user_id", userId)
+      .single();
+
+    if (fetchError || !existingTask) {
+      throw new Error("Task not found or does not belong to user");
+    }
+
+    const updates: Record<string, unknown> = {};
+
+    if (command.title !== undefined) {
+      updates.title = command.title;
+    }
+
+    if (command.description !== undefined) {
+      updates.description = command.description;
+    }
+
+    if (command.interval_value !== undefined) {
+      updates.interval_value = command.interval_value;
+    }
+
+    if (command.interval_unit !== undefined) {
+      updates.interval_unit = command.interval_unit;
+    }
+
+    if (command.preferred_day_of_week !== undefined) {
+      updates.preferred_day_of_week = command.preferred_day_of_week;
+    }
+
+    const intervalFieldUpdated =
+      command.interval_value !== undefined ||
+      command.interval_unit !== undefined ||
+      command.preferred_day_of_week !== undefined;
+
+    if (intervalFieldUpdated) {
+      const intervalValue = command.interval_value ?? existingTask.interval_value;
+      const intervalUnit = command.interval_unit ?? existingTask.interval_unit;
+      const preferredDay =
+        command.preferred_day_of_week !== undefined
+          ? command.preferred_day_of_week
+          : (existingTask.preferred_day_of_week ?? null);
+
+      updates.next_due_date = this.calculateNextDueDate(intervalValue, intervalUnit, preferredDay);
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return existingTask as TaskDTO;
+    }
+
+    const { data: updatedTask, error: updateError } = await this.supabase
+      .from("tasks")
+      .update(updates)
+      .eq("id", taskId)
+      .eq("user_id", userId)
+      .select()
+      .single();
+
+    if (updateError || !updatedTask) {
+      throw new Error(`Failed to update task: ${updateError?.message ?? "Unknown error"}`);
+    }
+
+    return updatedTask as TaskDTO;
   }
 
   /**
