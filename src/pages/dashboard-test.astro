@@ -1,0 +1,61 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { DashboardTest } from "../components/dashboard/Dashboard.test";
+
+/**
+ * STRONA TESTOWA DASHBOARD
+ *
+ * Ta strona służy wyłącznie do testowania widoku Dashboard bez autentykacji.
+ * Używa mock danych - wszystkie API calls są symulowane.
+ *
+ * Dostęp:
+ * - Default: http://localhost:4321/dashboard-test
+ * - Empty: http://localhost:4321/dashboard-test?scenario=empty
+ * - Next Task: http://localhost:4321/dashboard-test?scenario=next-task
+ *
+ * UWAGA: Usuń ten plik przed deploymentem do produkcji!
+ */
+
+// Mock userName
+const mockUserName = "Jan Testowy";
+
+// Scenariusz testowy z query params
+const scenario = Astro.url.searchParams.get("scenario") || "default";
+const validScenarios = ["default", "empty", "next-task"];
+const selectedScenario = validScenarios.includes(scenario) ? scenario : "default";
+
+// Wyłączenie prerendering
+export const prerender = false;
+---
+
+<Layout title="Dashboard Test - Chronos">
+  <div class="bg-yellow-50 dark:bg-yellow-900/20 border-b border-yellow-200 dark:border-yellow-800 px-4 py-3">
+    <div class="container mx-auto flex items-center justify-between gap-4 flex-wrap">
+      <p class="text-sm text-yellow-800 dark:text-yellow-200">
+        ⚠️ <strong>TRYB TESTOWY</strong> - Ta strona używa mock danych i nie wymaga logowania.
+      </p>
+      <div class="flex gap-2 text-xs">
+        <a
+          href="/dashboard-test"
+          class="px-3 py-1 rounded bg-white dark:bg-gray-800 border hover:bg-gray-50 dark:hover:bg-gray-700"
+        >
+          Default
+        </a>
+        <a
+          href="/dashboard-test?scenario=empty"
+          class="px-3 py-1 rounded bg-white dark:bg-gray-800 border hover:bg-gray-50 dark:hover:bg-gray-700"
+        >
+          Empty
+        </a>
+        <a
+          href="/dashboard-test?scenario=next-task"
+          class="px-3 py-1 rounded bg-white dark:bg-gray-800 border hover:bg-gray-50 dark:hover:bg-gray-700"
+        >
+          Next Task
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <DashboardTest client:load userName={mockUserName} scenario={selectedScenario} />
+</Layout>
