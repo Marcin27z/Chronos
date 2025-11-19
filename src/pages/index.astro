@@ -1,8 +1,31 @@
 ---
-import Welcome from "../components/Welcome.astro";
 import Layout from "../layouts/Layout.astro";
+import { Dashboard } from "../components/dashboard/Dashboard";
+
+// Sprawdzenie autentykacji użytkownika
+const supabase = Astro.locals.supabase;
+const {
+  data: { session },
+} = await supabase.auth.getSession();
+
+// Przekierowanie do loginu jeśli użytkownik nie jest zalogowany
+if (!session) {
+  return Astro.redirect("/login");
+}
+
+// Pobranie tokenu autoryzacyjnego
+const token = session.access_token;
+
+// Opcjonalne: Pobranie danych użytkownika dla personalizacji
+const {
+  data: { user },
+} = await supabase.auth.getUser();
+const userName = user?.user_metadata?.name || user?.email?.split("@")[0];
+
+// Wyłączenie prerendering dla tej strony (wymaga SSR)
+export const prerender = false;
 ---
 
-<Layout>
-  <Welcome />
+<Layout title="Dashboard - Chronos">
+  <Dashboard client:load token={token} userName={userName} />
 </Layout>
