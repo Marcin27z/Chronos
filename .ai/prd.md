@@ -72,12 +72,12 @@ Brak dedykowanego narzędzia prowadzi do pomijania ważnych obowiązków, takich
 
 -   ID: US-002
 -   Tytuł: Weryfikacja adresu e-mail
--   Opis: Jako nowy użytkownik, chcę kliknąć w link weryfikacyjny w otrzymanym e-mailu, aby aktywować moje konto i móc się zalogować.
+-   Opis: Jako nowy użytkownik, chcę kliknąć w link weryfikacyjny w otrzymanym e-mailu, aby aktywować moje konto i zostać automatycznie zalogowanym.
 -   Kryteria akceptacji:
     1.  E-mail weryfikacyjny zawiera unikalny, jednorazowy link.
     2.  Po kliknięciu w link, konto użytkownika zostaje aktywowane.
-    3.  Użytkownik jest przekierowany na stronę z potwierdzeniem aktywacji i przyciskiem logowania.
-    4.  Próba ponownego użycia linku skutkuje wyświetleniem informacji, że konto zostało już aktywowane.
+    3.  Użytkownik jest automatycznie zalogowany i przekierowany na dashboard z komunikatem powitalnym.
+    4.  Próba ponownego użycia linku skutkuje wyświetleniem informacji o błędzie.
 
 -   ID: US-003
 -   Tytuł: Onboarding po pierwszym logowaniu
