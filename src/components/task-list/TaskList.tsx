@@ -13,8 +13,12 @@ import { TaskDeleteDialog } from "./TaskDeleteDialog";
  * Główny kontener widoku listy zadań
  * Zarządza stanem, pobieraniem danych i orkiestruje wszystkie podkomponenty
  */
-export function TaskList() {
-  const { state, deleteState, actions } = useTaskList();
+interface TaskListProps {
+  token: string;
+}
+
+export function TaskList({ token }: TaskListProps) {
+  const { state, deleteState, actions } = useTaskList(token);
 
   return (
     <div className="container mx-auto px-4 py-8">

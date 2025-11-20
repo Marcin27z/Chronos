@@ -1,8 +1,21 @@
 ---
 import Layout from "@/layouts/Layout.astro";
 import { TaskList } from "@/components/task-list/TaskList";
+
+const supabase = Astro.locals.supabase;
+const {
+  data: { session },
+} = await supabase.auth.getSession();
+
+if (!session) {
+  return Astro.redirect("/login");
+}
+
+const token = session.access_token;
+
+export const prerender = false;
 ---
 
 <Layout title="Wszystkie zadania - Chronos">
-  <TaskList client:load />
+  <TaskList client:load token={token} />
 </Layout>

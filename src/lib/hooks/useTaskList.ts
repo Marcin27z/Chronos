@@ -7,7 +7,7 @@ import { getTasks, deleteTask } from "../api/tasks.api";
  * Custom hook do zarządzania stanem widoku listy zadań
  * Obsługuje sortowanie, paginację i usuwanie zadań
  */
-export function useTaskList() {
+export function useTaskList(token: string) {
   // ==================== STATE ====================
 
   const [state, setState] = useState<TaskListState>({
@@ -37,7 +37,7 @@ export function useTaskList() {
       const sortParam = `${direction === "desc" ? "-" : ""}${field}`;
       const offset = (state.currentPage - 1) * 50;
 
-      const data = await getTasks(sortParam, 50, offset);
+      const data = await getTasks(token, sortParam, 50, offset);
 
       setState((prev) => ({
         ...prev,
@@ -51,7 +51,7 @@ export function useTaskList() {
         isLoading: false,
       }));
     }
-  }, [state.sortConfig, state.currentPage]);
+  }, [state.sortConfig, state.currentPage, token]);
 
   // Fetch data on mount and when sort/page changes
   useEffect(() => {
@@ -108,7 +108,7 @@ export function useTaskList() {
     setDeleteState((prev) => ({ ...prev, isDeleting: true }));
 
     try {
-      await deleteTask(deleteState.task.id);
+      await deleteTask(deleteState.task.id, token);
       setDeleteState({ isOpen: false, task: null, isDeleting: false });
 
       // Jeśli usunęliśmy ostatnie zadanie na stronie > 1, cofnij się
@@ -122,7 +122,7 @@ export function useTaskList() {
       // Błąd będzie obsłużony przez error state w komponencie
       throw error;
     }
-  }, [deleteState.task, state.data?.data.length, state.currentPage, fetchTasks]);
+  }, [deleteState.task, state.data?.data.length, state.currentPage, fetchTasks, token]);
 
   /**
    * Ponawia próbę pobrania danych po błędzie

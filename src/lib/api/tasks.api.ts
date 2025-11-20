@@ -3,7 +3,7 @@ import type { CreateTaskCommand, TaskListDTO, TaskDTO, ErrorDTO, ValidationError
 /**
  * Pobiera listę zadań użytkownika z sortowaniem i paginacją
  */
-export async function getTasks(sort = "next_due_date", limit = 50, offset = 0): Promise<TaskListDTO> {
+export async function getTasks(token: string, sort = "next_due_date", limit = 50, offset = 0): Promise<TaskListDTO> {
   const params = new URLSearchParams({
     sort,
     limit: limit.toString(),
@@ -13,6 +13,7 @@ export async function getTasks(sort = "next_due_date", limit = 50, offset = 0): 
   const response = await fetch(`/api/tasks?${params}`, {
     method: "GET",
     headers: {
+      Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
     credentials: "include",
@@ -49,9 +50,12 @@ export async function getTask(taskId: string): Promise<TaskDTO> {
 /**
  * Usuwa zadanie
  */
-export async function deleteTask(taskId: string): Promise<void> {
+export async function deleteTask(taskId: string, token: string): Promise<void> {
   const response = await fetch(`/api/tasks/${taskId}`, {
     method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
     credentials: "include",
   });
 
