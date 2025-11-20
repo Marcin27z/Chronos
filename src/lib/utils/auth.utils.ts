@@ -1,5 +1,5 @@
 ﻿import type { User } from "@supabase/supabase-js";
-import type { SupabaseClient } from "../../db/supabase.client";
+import type { SupabaseServerClient } from "../../db/supabase.client";
 import type { ErrorDTO } from "../../types";
 
 /**
@@ -12,7 +12,7 @@ import type { ErrorDTO } from "../../types";
  */
 export async function authenticateUser(
   request: Request,
-  supabase: SupabaseClient
+  supabase: SupabaseServerClient
 ): Promise<{ user: User | null; errorResponse: Response | null }> {
   // Check for Authorization header
   const authHeader = request.headers.get("authorization");

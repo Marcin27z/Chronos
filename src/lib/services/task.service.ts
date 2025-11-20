@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "../../db/supabase.client";
+import type { SupabaseServerClient } from "../../db/supabase.client";
 import type {
   CreateTaskCommand,
   TaskDTO,
@@ -21,7 +21,7 @@ import type {
  * - Date calculations based on interval and preferences
  */
 export class TaskService {
-  constructor(private supabase: SupabaseClient) {}
+  constructor(private supabase: SupabaseServerClient) {}
 
   /**
    * Creates a new task for the authenticated user

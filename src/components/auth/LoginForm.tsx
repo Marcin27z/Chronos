@@ -1,28 +1,33 @@
 import * as React from "react";
 import { useId } from "react";
-import { z } from "zod";
 
 import { AuthButton } from "./AuthButton";
 import { AuthCard } from "./AuthCard";
 import { AuthInput } from "./AuthInput";
+import { loginSchema, type LoginFormData } from "../../lib/utils/auth.validation";
 
-const loginSchema = z.object({
-  email: z.string().email("Nieprawidłowy format adresu e-mail"),
-  password: z.string().min(1, "Hasło jest wymagane"),
-});
+export interface LoginFormStatus {
+  type: "error" | "success" | "info";
+  message: string;
+}
 
-type LoginFormValues = z.infer<typeof loginSchema>;
+interface LoginFormProps {
+  initialStatus?: LoginFormStatus;
+}
 
-export function LoginForm() {
-  const [form, setForm] = React.useState<LoginFormValues>({ email: "", password: "" });
-  const [status, setStatus] = React.useState<{ type: "error" | "success" | "info"; message: string } | null>(null);
+export function LoginForm({ initialStatus }: LoginFormProps) {
+  const [form, setForm] = React.useState<LoginFormData>({ email: "", password: "" });
+  const [status, setStatus] = React.useState<LoginFormStatus | null>(initialStatus ?? null);
   const [isLoading, setIsLoading] = React.useState(false);
   const [isTouched, setIsTouched] = React.useState(false);
   const baseId = useId();
-  const timeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  React.useEffect(() => {
+    setStatus(initialStatus ?? null);
+  }, [initialStatus]);
 
   const handleChange = React.useCallback(
-    (field: keyof LoginFormValues) => (event: React.ChangeEvent<HTMLInputElement>) => {
+    (field: keyof LoginFormData) => (event: React.ChangeEvent<HTMLInputElement>) => {
       setForm((prev) => ({ ...prev, [field]: event.target.value }));
       setIsTouched(true);
       setStatus(null);
@@ -31,31 +36,44 @@ export function LoginForm() {
   );
 
   const handleSubmit = React.useCallback(
-    (event: React.FormEvent<HTMLFormElement>) => {
+    async (event: React.FormEvent<HTMLFormElement>) => {
       event.preventDefault();
-      const result = loginSchema.safeParse(form);
-      if (!result.success) {
-        setStatus({ type: "error", message: result.error.errors[0]?.message ?? "Sprawdź pola formularza" });
+      const validation = loginSchema.safeParse(form);
+      if (!validation.success) {
+        setStatus({ type: "error", message: validation.error.errors[0]?.message ?? "Sprawdź pola formularza" });
         return;
       }
 
       setIsLoading(true);
-      setStatus({ type: "info", message: "Formularz gotowy do integracji z backendem." });
-      timeoutRef.current = setTimeout(() => {
+      setStatus({ type: "info", message: "Łączenie z serwerem..." });
+
+      try {
+        const response = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(validation.data),
+        });
+
+        const payload = await response.json().catch(() => null);
+
+        if (!response.ok) {
+          setStatus({
+            type: "error",
+            message: payload?.error ?? "Wystąpił błąd. Spróbuj ponownie",
+          });
+          return;
+        }
+
+        setStatus({ type: "success", message: "Logowanie powiodło się. Przekierowuję..." });
+        window.location.assign(payload?.redirectTo ?? "/");
+      } catch {
+        setStatus({ type: "error", message: "Wystąpił błąd. Spróbuj ponownie" });
+      } finally {
         setIsLoading(false);
-        setStatus({ type: "success", message: "Dane zostały przygotowane do wysłania." });
-      }, 600);
+      }
     },
     [form]
   );
-
-  React.useEffect(() => {
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, []);
 
   return (
     <AuthCard title="Zaloguj się" description="Wprowadź swoje dane żeby kontynuować">
