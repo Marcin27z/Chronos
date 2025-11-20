@@ -10,3 +10,16 @@ export async function signInWithEmailPassword(
     password,
   });
 }
+
+export async function signUpWithEmailPassword(
+  supabase: SupabaseServerClient,
+  email: string,
+  password: string,
+  options?: { emailRedirectTo?: string }
+): Promise<Awaited<ReturnType<SupabaseServerClient["auth"]["signUp"]>>> {
+  return supabase.auth.signUp({
+    email,
+    password,
+    options: options?.emailRedirectTo ? { emailRedirectTo: options.emailRedirectTo } : undefined,
+  });
+}

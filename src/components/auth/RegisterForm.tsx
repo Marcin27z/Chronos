@@ -1,144 +1,171 @@
 import * as React from "react";
 import { useId } from "react";
-import { z } from "zod";
 
 import { AuthButton } from "./AuthButton";
 import { AuthCard } from "./AuthCard";
 import { AuthInput } from "./AuthInput";
+import { registerSchema, type RegisterFormData } from "../../lib/utils/auth.validation";
 
-const registerSchema = z
-  .object({
-    email: z.string().email("Nieprawidłowy format adresu e-mail"),
-    password: z
-      .string()
-      .min(8, "Hasło musi mieć co najmniej 8 znaków")
-      .regex(/[A-Z]/, "Hasło musi zawierać przynajmniej jedną wielką literę")
-      .regex(/[a-z]/, "Hasło musi zawierać przynajmniej jedną małą literę")
-      .regex(/[0-9]/, "Hasło musi zawierać przynajmniej jedną cyfrę"),
-    confirmPassword: z.string(),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "Hasła muszą być identyczne",
-    path: ["confirmPassword"],
-  });
+export interface RegisterFormStatus {
+  type: "error" | "success" | "info";
+  message: string;
+}
 
-type RegisterFormValues = z.infer<typeof registerSchema>;
+const getInitialFormState = (): RegisterFormData => ({
+  email: "",
+  password: "",
+  confirmPassword: "",
+});
+
+const passwordHints = [
+  { label: "duża litera", pattern: /[A-Z]/ },
+  { label: "mała litera", pattern: /[a-z]/ },
+  { label: "cyfra", pattern: /[0-9]/ },
+  { label: "min. 8 znaków", pattern: /.{8,}/ },
+];
 
 export function RegisterForm() {
-  const [form, setForm] = React.useState<RegisterFormValues>({
-    email: "",
-    password: "",
-    confirmPassword: "",
-  });
-  const [status, setStatus] = React.useState<{ type: "error" | "success" | "info"; message: string } | null>(null);
+  const [form, setForm] = React.useState<RegisterFormData>(() => getInitialFormState());
+  const [status, setStatus] = React.useState<RegisterFormStatus | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
+  const [isTouched, setIsTouched] = React.useState(false);
   const baseId = useId();
-  const timeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const statusToneClass = React.useMemo(() => {
+    if (status?.type === "error") {
+      return "bg-destructive/10 text-destructive";
+    }
+
+    if (status?.type === "success") {
+      return "bg-green-50 text-green-700";
+    }
+
+    return "bg-primary/10 text-primary";
+  }, [status?.type]);
+
+  const passwordFeedback = React.useMemo(() => {
+    if (!form.password) {
+      return "Hasło powinno zawierać co najmniej 8 znaków, jedną wielką literę, jedną małą literę i cyfrę.";
+    }
+    const passed = passwordHints.filter((hint) => hint.pattern.test(form.password));
+    if (passed.length === passwordHints.length) {
+      return undefined;
+    }
+
+    return `Spełnione: ${passed.map((hint) => hint.label).join(", ") || "żadne"}.`;
+  }, [form.password]);
 
   const handleChange = React.useCallback(
-    (field: keyof RegisterFormValues) => (event: React.ChangeEvent<HTMLInputElement>) => {
+    (field: keyof RegisterFormData) => (event: React.ChangeEvent<HTMLInputElement>) => {
       setForm((prev) => ({ ...prev, [field]: event.target.value }));
+      setIsTouched(true);
       setStatus(null);
     },
     []
   );
 
-  const password = form.password;
-  const passwordFeedback = React.useMemo(() => {
-    if (!password) {
-      return "Hasło powinno zawierać co najmniej 8 znaków, jedną wielką literę, jedną małą literę i cyfrę.";
-    }
-
-    const checks = [
-      { label: "duża litera", pattern: /[A-Z]/ },
-      { label: "mała litera", pattern: /[a-z]/ },
-      { label: "cyfra", pattern: /[0-9]/ },
-      { label: "min. 8 znaków", pattern: /.{8,}/ },
-    ];
-
-    const passed = checks.filter((check) => check.pattern.test(password));
-    if (passed.length === checks.length) {
-      return undefined;
-    }
-
-    return `Spełnione: ${passed.map((check) => check.label).join(", ") || "żadne"}.`;
-  }, [password]);
-
   const handleSubmit = React.useCallback(
-    (event: React.FormEvent<HTMLFormElement>) => {
+    async (event: React.FormEvent<HTMLFormElement>) => {
       event.preventDefault();
-      const result = registerSchema.safeParse(form);
-      if (!result.success) {
-        setStatus({ type: "error", message: result.error.errors[0]?.message ?? "Sprawdź dane formularza" });
+      const validation = registerSchema.safeParse(form);
+      if (!validation.success) {
+        setStatus({ type: "error", message: validation.error.errors[0]?.message ?? "Sprawdź dane formularza" });
         return;
       }
 
       setIsLoading(true);
-      setStatus({ type: "info", message: "Tworzymy konto... (symulacja UI)" });
-      timeoutRef.current = setTimeout(() => {
+      setStatus({ type: "info", message: "Łączenie z serwerem..." });
+
+      try {
+        const response = await fetch("/api/auth/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(validation.data),
+        });
+
+        const payload = await response.json().catch(() => null);
+
+        if (!response.ok) {
+          setStatus({
+            type: "error",
+            message: payload?.error ?? "Wystąpił błąd. Spróbuj ponownie",
+          });
+          return;
+        }
+
+        setStatus({
+          type: "success",
+          message:
+            payload?.message ?? "Na adres e-mail wysłaliśmy link weryfikacyjny. Sprawdź swoją skrzynkę pocztową.",
+        });
+        setForm(getInitialFormState());
+        setIsTouched(false);
+      } catch {
+        setStatus({ type: "error", message: "Wystąpił błąd. Spróbuj ponownie" });
+      } finally {
         setIsLoading(false);
-        setStatus({ type: "success", message: "Gotowe! Możemy podłączyć backend w kolejnym kroku." });
-      }, 600);
+      }
     },
     [form]
   );
 
-  React.useEffect(() => {
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, []);
-
   return (
     <AuthCard title="Zarejestruj się" description="Utwórz konto aby zacząć planować">
       {status && (
-        <div
-          className={`rounded-md px-4 py-3 text-sm ${
-            status.type === "error"
-              ? "bg-destructive/10 text-destructive"
-              : status.type === "success"
-                ? "bg-green-50 text-green-700"
-                : "bg-primary/10 text-primary"
-          }`}
-          role="status"
-        >
+        <div className={`rounded-md px-4 py-3 text-sm ${statusToneClass}`} role="status">
           {status.message}
         </div>
       )}
 
-      <form className="space-y-4" onSubmit={handleSubmit} noValidate>
-        <AuthInput
-          id={`${baseId}-register-email`}
-          label="Adres e-mail"
-          type="email"
-          value={form.email}
-          onChange={handleChange("email")}
-          placeholder="name@example.com"
-        />
-        <AuthInput
-          id={`${baseId}-register-password`}
-          label="Hasło"
-          type="password"
-          value={form.password}
-          onChange={handleChange("password")}
-          helperText={passwordFeedback || undefined}
-          placeholder="••••••••"
-        />
-        <AuthInput
-          id={`${baseId}-register-confirm`}
-          label="Potwierdź hasło"
-          type="password"
-          value={form.confirmPassword}
-          onChange={handleChange("confirmPassword")}
-          placeholder="••••••••"
-        />
+      {status?.type === "success" ? (
+        <div className="pt-6">
+          <a
+            className="inline-flex w-full justify-center rounded-md bg-primary px-4 py-2 text-sm font-semibold uppercase tracking-wide text-white transition hover:bg-primary/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            href="/"
+          >
+            Przejdź do aplikacji
+          </a>
+          <p className="mt-3 text-xs text-muted-foreground">
+            {"Link weryfikacyjny potwierdzi konto i automatycznie przekieruje Cię do aplikacji. " +
+              "Jeśli już potwierdziłeś e-mail, użyj przycisku powyżej."}
+          </p>
+        </div>
+      ) : (
+        <form className="space-y-4" onSubmit={handleSubmit} noValidate>
+          <AuthInput
+            id={`${baseId}-register-email`}
+            label="Adres e-mail"
+            type="email"
+            value={form.email}
+            onChange={handleChange("email")}
+            error={isTouched && !form.email ? "E-mail jest wymagany" : undefined}
+            placeholder="name@example.com"
+          />
+          <AuthInput
+            id={`${baseId}-register-password`}
+            label="Hasło"
+            type="password"
+            value={form.password}
+            onChange={handleChange("password")}
+            helperText={passwordFeedback || undefined}
+            error={isTouched && !form.password ? "Hasło jest wymagane" : undefined}
+            placeholder="••••••••"
+          />
+          <AuthInput
+            id={`${baseId}-register-confirm`}
+            label="Potwierdź hasło"
+            type="password"
+            value={form.confirmPassword}
+            onChange={handleChange("confirmPassword")}
+            error={isTouched && !form.confirmPassword ? "Potwierdź hasło" : undefined}
+            placeholder="••••••••"
+          />
 
-        <AuthButton type="submit" isLoading={isLoading}>
-          Zarejestruj konto
-        </AuthButton>
-      </form>
+          <AuthButton type="submit" isLoading={isLoading}>
+            Zarejestruj konto
+          </AuthButton>
+        </form>
+      )}
 
       <p className="text-xs text-muted-foreground">
         Masz konto w Chronos?{" "}

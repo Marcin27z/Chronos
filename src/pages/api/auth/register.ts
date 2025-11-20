@@ -1,8 +1,8 @@
 import type { APIRoute } from "astro";
 
 import { createSupabaseServerInstance } from "../../../db/supabase.client";
-import { signInWithEmailPassword } from "../../../lib/services/auth.service";
-import { loginSchema } from "../../../lib/utils/auth.validation";
+import { signUpWithEmailPassword } from "../../../lib/services/auth.service";
+import { registerSchema } from "../../../lib/utils/auth.validation";
 import { getAuthErrorMessage } from "../../../lib/utils/auth-errors.utils";
 
 const jsonHeaders = { "Content-Type": "application/json" };
@@ -15,11 +15,12 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   let payload: unknown;
   try {
     payload = await request.json();
-  } catch {
+  } catch (error) {
+    console.error("Register payload parse error:", error);
     return new Response(JSON.stringify({ error: "Nieprawidłowe dane" }), { status: 400, headers: jsonHeaders });
   }
 
-  const parseResult = loginSchema.safeParse(payload);
+  const parseResult = registerSchema.safeParse(payload);
   if (!parseResult.success) {
     return new Response(JSON.stringify({ error: parseResult.error.errors[0]?.message ?? "Nieprawidłowe dane" }), {
       status: 400,
@@ -28,31 +29,27 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   }
 
   const { email, password } = parseResult.data;
-  const { data, error } = await signInWithEmailPassword(supabase, email, password);
+  const origin = new URL(request.url).origin;
+  const redirectTo = `${origin}/verify-email`;
 
-  if (error || !data?.session) {
-    const errorMessage = getAuthErrorMessage(error ?? null);
+  const { error } = await signUpWithEmailPassword(supabase, email, password, { emailRedirectTo: redirectTo });
+
+  if (error) {
+    const errorMessage = getAuthErrorMessage(error);
     return new Response(JSON.stringify({ error: errorMessage }), {
-      status: error?.status ?? 400,
+      status: error.status ?? 400,
       headers: jsonHeaders,
     });
   }
 
-  if (!data.user?.email_confirmed_at) {
-    await supabase.auth.signOut();
-    return new Response(
-      JSON.stringify({
-        error: "Konto nie zostało jeszcze zweryfikowane. Sprawdź swoją skrzynkę e-mail",
-      }),
-      {
-        status: 401,
-        headers: jsonHeaders,
-      }
-    );
-  }
-
-  return new Response(JSON.stringify({ success: true, redirectTo: "/" }), {
-    status: 200,
-    headers: jsonHeaders,
-  });
+  return new Response(
+    JSON.stringify({
+      success: true,
+      message: `Na adres ${email} wysłaliśmy link weryfikacyjny. Sprawdź swoją skrzynkę pocztową.`,
+    }),
+    {
+      status: 200,
+      headers: jsonHeaders,
+    }
+  );
 };

@@ -1,6 +1,14 @@
 import type { AuthError } from "@supabase/supabase-js";
 
 const authErrorMappings: { match: string; message: string }[] = [
+  {
+    match: "User already registered",
+    message: "Ten adres e-mail jest już zarejestrowany",
+  },
+  {
+    match: "Email already exists",
+    message: "Ten adres e-mail jest już zarejestrowany",
+  },
   { match: "Invalid login credentials", message: "Nieprawidłowy e-mail lub hasło" },
   {
     match: "Email not confirmed",
