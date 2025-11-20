@@ -1,4 +1,4 @@
-import type { TaskListDTO, TaskDTO, ErrorDTO } from "../../types";
+import type { CreateTaskCommand, TaskListDTO, TaskDTO, ErrorDTO, ValidationErrorDTO } from "../../types";
 
 /**
  * Pobiera listę zadań użytkownika z sortowaniem i paginacją
@@ -59,4 +59,30 @@ export async function deleteTask(taskId: string): Promise<void> {
     const error = await response.json();
     throw error as ErrorDTO;
   }
+}
+
+export interface TaskApiError {
+  status: number;
+  payload: ErrorDTO | ValidationErrorDTO;
+}
+
+export async function createTask(token: string, command: CreateTaskCommand): Promise<TaskDTO> {
+  const response = await fetch("/api/tasks", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(command),
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json()) as ErrorDTO | ValidationErrorDTO;
+    throw {
+      status: response.status,
+      payload,
+    } satisfies TaskApiError;
+  }
+
+  return response.json();
 }

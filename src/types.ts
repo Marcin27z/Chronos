@@ -42,6 +42,61 @@ export type CreateTaskCommand = Pick<
 >;
 
 /**
+ * Client-side representation of the create task form
+ */
+export interface CreateTaskViewModel {
+  title: string;
+  description?: string;
+  interval_value: number;
+  interval_unit: IntervalUnit;
+  preferred_day_of_week: number | null;
+}
+
+/**
+ * Preview model for the computed next due date shown on the form
+ */
+export interface NextDueDatePreviewModel {
+  nextDueDate: string | null;
+  description: string;
+}
+
+/**
+ * Form state metadata helper
+ */
+export interface FormFieldMeta {
+  touched: boolean;
+  error?: string;
+}
+
+/**
+ * Validation state emitted by the create task form hook
+ */
+export type ValidationState = Partial<Record<keyof CreateTaskViewModel, string | undefined>> & {
+  general?: string;
+};
+
+/**
+ * Response returned after successfully creating a task
+ */
+export type CreateTaskResponseDTO = TaskDTO;
+
+/**
+ * Interval option for selects and toggles
+ */
+export interface IntervalOption {
+  label: string;
+  value: IntervalUnit;
+}
+
+/**
+ * Day option for the optional day selector
+ */
+export interface DayOption {
+  label: string;
+  value: number;
+}
+
+/**
  * Command to update an existing task
  * All fields are optional, at least one must be provided
  * Based on Tasks Update, excluding user_id and auto-managed fields
