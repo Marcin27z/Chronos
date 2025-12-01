@@ -1,4 +1,5 @@
 import type { Tables, TablesInsert, TablesUpdate, Enums } from "./db/database.types";
+import type { ReactNode } from "react";
 
 // ============================================================================
 // Database Entity Type Aliases
@@ -369,3 +370,92 @@ export interface ErrorDTO {
    */
   details?: string;
 }
+
+// ============================================================================
+// Navigation & UI View Models
+// ============================================================================
+
+/**
+ * Navigation item data transfer object
+ */
+export interface NavItemDTO {
+  label: string;
+  href: string;
+  icon?: ReactNode;
+  visible?: boolean;
+  query?: Record<string, string>;
+}
+
+/**
+ * User menu option data
+ */
+export interface UserMenuOptionVM {
+  label: string;
+  href?: string;
+  action?: () => Promise<void> | void;
+  disabled?: boolean;
+  icon?: ReactNode;
+  type: "link" | "action";
+}
+
+/**
+ * Breadcrumb entry for hierarchical navigation
+ */
+export interface BreadcrumbEntry {
+  label: string;
+  href?: string;
+  isCurrent?: boolean;
+}
+
+/**
+ * User profile view model consumed by UI
+ */
+export interface UserProfileVM {
+  id: string;
+  name: string;
+  email: string;
+  avatarUrl?: string;
+  role?: string;
+}
+
+/**
+ * Navbar UI state shared across components
+ */
+export interface NavbarState {
+  activePath: string;
+  isMobileMenuOpen: boolean;
+  isUserMenuOpen: boolean;
+  breadcrumbs: BreadcrumbEntry[];
+}
+
+/**
+ * Guard model for unsaved form changes
+ */
+export interface FormGuardViewModel {
+  hasUnsavedChanges: boolean;
+  warningMessage: string;
+  lastAttemptedLocation?: string;
+}
+
+/**
+ * Context payload for navigation helpers
+ */
+export interface NavContextValue {
+  navItems: NavItemDTO[];
+  breadcrumbs: BreadcrumbEntry[];
+  activeItem?: NavItemDTO;
+  setActivePath: (path: string) => void;
+}
+
+/**
+ * Mobile menu state helper
+ */
+export interface MobileMenuState {
+  isOpen: boolean;
+  pendingNav?: string;
+}
+
+/**
+ * Predefined breadcrumb configuration per route
+ */
+export type BreadcrumbsMap = Record<string, BreadcrumbEntry[]>;

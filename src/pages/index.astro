@@ -1,5 +1,5 @@
 ---
-import Layout from "../layouts/Layout.astro";
+import AppLayout from "@/layouts/AppLayout.astro";
 import { Dashboard } from "../components/dashboard/Dashboard";
 
 // Sprawdzenie autentykacji użytkownika
@@ -20,12 +20,21 @@ const token = session.access_token;
 const {
   data: { user },
 } = await supabase.auth.getUser();
-const userName = user?.user_metadata?.name || user?.email?.split("@")[0];
+
+const userProfile =
+  user && user.email
+    ? {
+        id: user.id,
+        name: user.user_metadata?.name || user.email.split("@")[0],
+        email: user.email,
+        avatarUrl: user.user_metadata?.avatarUrl || user.user_metadata?.avatar_url,
+      }
+    : null;
 
 // Wyłączenie prerendering dla tej strony (wymaga SSR)
 export const prerender = false;
 ---
 
-<Layout title="Dashboard - Chronos">
-  <Dashboard client:load token={token} userName={userName} />
-</Layout>
+<AppLayout title="Dashboard - Chronos" userProfile={userProfile}>
+  <Dashboard client:load token={token} userName={userProfile?.name ?? user?.email?.split("@")[0]} />
+</AppLayout>

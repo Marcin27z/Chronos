@@ -1,5 +1,5 @@
 ---
-import Layout from "@/layouts/Layout.astro";
+import AppLayout from "@/layouts/AppLayout.astro";
 import { TaskForm } from "@/components/tasks/TaskForm";
 
 const supabase = Astro.locals.supabase;
@@ -15,10 +15,10 @@ const token = session.access_token;
 export const prerender = false;
 ---
 
-<Layout title="Nowe zadanie">
-  <main class="flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center px-4 py-12">
+<AppLayout title="Nowe zadanie - Chronos">
+  <div class="flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center px-4 py-12">
     <div class="w-full max-w-3xl">
       <TaskForm client:load token={token} />
     </div>
-  </main>
-</Layout>
+  </div>
+</AppLayout>

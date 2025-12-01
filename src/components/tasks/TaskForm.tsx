@@ -9,6 +9,7 @@ import { FormErrorsAlert } from "./FormErrorsAlert";
 import { FormSuccessAlert } from "./FormSuccessAlert";
 import { createTask, type TaskApiError } from "@/lib/api/tasks.api";
 import { useCreateTaskForm } from "@/lib/hooks/useCreateTaskForm";
+import { BackButtonGuard } from "@/components/guards/BackButtonGuard";
 import type { CreateTaskViewModel, ValidationErrorDetail, ValidationState } from "@/types";
 
 interface TaskFormProps {
@@ -82,19 +83,6 @@ export function TaskForm({ token, onSubmit, onCancel }: TaskFormProps) {
     };
   }, []);
 
-  React.useEffect(() => {
-    const handler = (event: BeforeUnloadEvent) => {
-      if (!isDirty) {
-        return;
-      }
-      event.preventDefault();
-      event.returnValue = "";
-    };
-
-    window.addEventListener("beforeunload", handler);
-    return () => window.removeEventListener("beforeunload", handler);
-  }, [isDirty]);
-
   const handleSubmit = React.useCallback(
     async (event: React.FormEvent<HTMLFormElement>) => {
       event.preventDefault();
@@ -150,43 +138,46 @@ export function TaskForm({ token, onSubmit, onCancel }: TaskFormProps) {
   }, [isDirty, onCancel, resetForm, setGeneralErrorMessage]);
 
   return (
-    <form
-      className="space-y-6 rounded-xl border border-border bg-card/80 p-6 shadow-lg shadow-muted-foreground/20 backdrop-blur"
-      onSubmit={handleSubmit}
-      data-token={token}
-    >
-      <TaskFormHeader status={statusMessage} statusTone={statusTone} statusId={statusId} />
+    <>
+      <BackButtonGuard hasUnsavedChanges={isDirty} />
+      <form
+        className="space-y-6 rounded-xl border border-border bg-card/80 p-6 shadow-lg shadow-muted-foreground/20 backdrop-blur"
+        onSubmit={handleSubmit}
+        data-token={token}
+      >
+        <TaskFormHeader status={statusMessage} statusTone={statusTone} statusId={statusId} />
 
-      {successMessage && <FormSuccessAlert message={successMessage} />}
-      {generalError && <FormErrorsAlert message={generalError} />}
+        {successMessage && <FormSuccessAlert message={successMessage} />}
+        {generalError && <FormErrorsAlert message={generalError} />}
 
-      <TaskBaseFields
-        title={values.title}
-        description={values.description}
-        errors={errors}
-        touched={meta}
-        onTitleChange={handleTitleChange}
-        onDescriptionChange={handleDescriptionChange}
-        onBlur={handleBlur}
-      />
+        <TaskBaseFields
+          title={values.title}
+          description={values.description}
+          errors={errors}
+          touched={meta}
+          onTitleChange={handleTitleChange}
+          onDescriptionChange={handleDescriptionChange}
+          onBlur={handleBlur}
+        />
 
-      <ScheduleSection
-        intervalValue={values.interval_value}
-        intervalUnit={values.interval_unit}
-        preferredDayOfWeek={values.preferred_day_of_week}
-        onIntervalValueChange={handleIntervalValueChange}
-        onIntervalUnitChange={handleIntervalUnitChange}
-        onPreferredDayChange={handlePreferredDayChange}
-        errors={errors}
-        intervalHelperId={intervalHelperId}
-        intervalHelperText={intervalHelperText}
-        dayHelperId={dayHelperId}
-        dayHelperText={dayHelperText}
-      />
+        <ScheduleSection
+          intervalValue={values.interval_value}
+          intervalUnit={values.interval_unit}
+          preferredDayOfWeek={values.preferred_day_of_week}
+          onIntervalValueChange={handleIntervalValueChange}
+          onIntervalUnitChange={handleIntervalUnitChange}
+          onPreferredDayChange={handlePreferredDayChange}
+          errors={errors}
+          intervalHelperId={intervalHelperId}
+          intervalHelperText={intervalHelperText}
+          dayHelperId={dayHelperId}
+          dayHelperText={dayHelperText}
+        />
 
-      <NextDueDatePreview preview={nextDueDatePreview} />
+        <NextDueDatePreview preview={nextDueDatePreview} />
 
-      <FormActions isSubmitting={isSubmitting} hasErrors={hasFieldErrors} onCancel={handleCancel} />
-    </form>
+        <FormActions isSubmitting={isSubmitting} hasErrors={hasFieldErrors} onCancel={handleCancel} />
+      </form>
+    </>
   );
 }

@@ -1,5 +1,5 @@
 ---
-import Layout from "@/layouts/Layout.astro";
+import AppLayout from "@/layouts/AppLayout.astro";
 import { TaskList } from "@/components/task-list/TaskList";
 
 const supabase = Astro.locals.supabase;
@@ -16,6 +16,6 @@ const token = session.access_token;
 export const prerender = false;
 ---
 
-<Layout title="Wszystkie zadania - Chronos">
+<AppLayout title="Wszystkie zadania - Chronos">
   <TaskList client:load token={token} />
-</Layout>
+</AppLayout>
