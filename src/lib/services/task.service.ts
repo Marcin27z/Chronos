@@ -268,16 +268,11 @@ export class TaskService {
         break;
 
       case "months":
-        nextDate = new Date(baseDate);
-        nextDate.setUTCMonth(baseDate.getUTCMonth() + intervalValue);
-        // Handle month overflow (e.g., Jan 31 + 1 month = Feb 28/29)
-        // JavaScript Date automatically handles this correctly
+        nextDate = addMonthsUTC(baseDate, intervalValue);
         break;
 
       case "years":
-        nextDate = new Date(baseDate);
-        nextDate.setUTCFullYear(baseDate.getUTCFullYear() + intervalValue);
-        // Handle leap year edge cases automatically
+        nextDate = addMonthsUTC(baseDate, intervalValue * 12);
         break;
 
       default:
@@ -586,4 +581,30 @@ export class TaskService {
 
     // Success - task deleted, no return value needed
   }
+}
+
+const MONTH_DAY_COUNTS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+function isLeapYear(year: number): boolean {
+  return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+}
+
+function getDaysInMonth(year: number, month: number): number {
+  if (month === 1) {
+    return isLeapYear(year) ? 29 : 28;
+  }
+
+  return MONTH_DAY_COUNTS[month];
+}
+
+function addMonthsUTC(date: Date, months: number): Date {
+  const result = new Date(date);
+  const day = result.getUTCDate();
+
+  result.setUTCDate(1);
+  result.setUTCMonth(result.getUTCMonth() + months);
+  const daysInTargetMonth = getDaysInMonth(result.getUTCFullYear(), result.getUTCMonth());
+  result.setUTCDate(Math.min(day, daysInTargetMonth));
+
+  return result;
 }
