@@ -74,6 +74,18 @@ npm run dev
 - `npm run lint` - Run ESLint
 - `npm run lint:fix` - Fix ESLint issues automatically
 - `npm run format` - Format code with Prettier
+- `npm run test` - Run the Vitest suite (jsdom + shared setup)
+- `npm run test:watch` - Watch and rerun Vitest on file saves
+- `npm run test:ui` - Open the Vitest UI explorer
+- `npm run test:e2e` - Execute Playwright (Chromium/Chrome) suites
+- `npm run test:e2e:headed` - Run Playwright in headed mode for troubleshooting
+- `npm run test:e2e:codegen` - Launch Playwright codegen for recording
+
+## Testing
+
+- See `docs/testing-environment.md` for how we align the stack described in `.ai/tech-stack.md` with the Vitest and Playwright guidelines stored under `.cursor/rules/`.
+- Vitest uses `jsdom`, inline snapshots, and the shared setup file (`src/tests/setup/vitest.setup.ts`) so that React components render with the same environment used in development.
+- Playwright is locked to Chromium/Chrome, uses browser contexts by default, and emits traces/videos/screenshots to `tests/e2e/test-results` to help debug per the `.cursor/rules/playwright-testing-rules.mdc` guidelines.
 
 ## Project Scope
 
