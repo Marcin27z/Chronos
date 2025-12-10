@@ -7,6 +7,8 @@ import { EmptyState } from "./EmptyState";
 import { LoadingState } from "./LoadingState";
 import { ErrorState } from "./ErrorState";
 import { TaskDeleteDialog } from "./TaskDeleteDialog";
+import { Button } from "@/components/ui/button";
+import { Plus } from "lucide-react";
 
 /**
  * TaskList component
@@ -19,9 +21,23 @@ interface TaskListProps {
 
 export function TaskList({ token }: TaskListProps) {
   const { state, deleteState, actions } = useTaskList(token);
+  const hasTasks = Boolean(state.data && state.data.data.length > 0);
+  const showDataState = !state.isLoading && !state.error && hasTasks;
 
   return (
     <div className="container mx-auto px-4 py-8">
+      {showDataState && state.data && (
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <TaskListHeader totalCount={state.data.pagination.total} />
+          <Button asChild size="sm">
+            <a className="flex items-center gap-2" href="/tasks/new" aria-label="Dodaj nowe zadanie">
+              <Plus className="h-4 w-4" />
+              Dodaj zadanie
+            </a>
+          </Button>
+        </div>
+      )}
+
       {/* Loading State */}
       {state.isLoading && <LoadingState />}
 
@@ -32,11 +48,8 @@ export function TaskList({ token }: TaskListProps) {
       {!state.isLoading && !state.error && state.data?.data.length === 0 && <EmptyState />}
 
       {/* Data State */}
-      {!state.isLoading && !state.error && state.data && state.data.data.length > 0 && (
+      {showDataState && state.data && (
         <>
-          {/* Header */}
-          <TaskListHeader totalCount={state.data.pagination.total} />
-
           {/* Sort Controls */}
           <TaskSortFilter sortConfig={state.sortConfig} onSortChange={actions.handleSortChange} />
 
