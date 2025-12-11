@@ -144,6 +144,7 @@ export function TaskForm({ token, onSubmit, onCancel }: TaskFormProps) {
         className="space-y-6 rounded-xl border border-border bg-card/80 p-6 shadow-lg shadow-muted-foreground/20 backdrop-blur"
         onSubmit={handleSubmit}
         data-token={token}
+        data-testid="task-form"
       >
         <TaskFormHeader status={statusMessage} statusTone={statusTone} statusId={statusId} />
 

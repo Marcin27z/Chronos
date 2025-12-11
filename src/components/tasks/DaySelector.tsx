@@ -33,7 +33,7 @@ export function DaySelector({ value, onChange, error, helperText, helperId }: Da
   const describedBy = [error ? "day-error" : null, helperId].filter(Boolean).join(" ") || undefined;
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" data-testid="task-day-selector">
       <div className="flex items-center justify-between">
         <p className="text-sm font-medium text-foreground">Preferowany dzień tygodnia</p>
         <span className="text-xs text-muted-foreground">Opcjonalne</span>
@@ -54,6 +54,7 @@ export function DaySelector({ value, onChange, error, helperText, helperId }: Da
                   : "border-border bg-background text-foreground hover:border-primary/80"
               }`}
               aria-describedby={describedBy}
+              data-testid={`task-day-button-${day.value}`}
             >
               {day.label}
             </button>

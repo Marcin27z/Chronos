@@ -25,12 +25,17 @@ export function TaskList({ token }: TaskListProps) {
   const showDataState = !state.isLoading && !state.error && hasTasks;
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-4 py-8" data-testid="tasks-page">
       {showDataState && state.data && (
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <TaskListHeader totalCount={state.data.pagination.total} />
           <Button asChild size="sm">
-            <a className="flex items-center gap-2" href="/tasks/new" aria-label="Dodaj nowe zadanie">
+            <a
+              className="flex items-center gap-2"
+              href="/tasks/new"
+              aria-label="Dodaj nowe zadanie"
+              data-testid="tasks-add-new"
+            >
               <Plus className="h-4 w-4" />
               Dodaj zadanie
             </a>

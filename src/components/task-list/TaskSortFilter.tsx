@@ -23,7 +23,7 @@ export function TaskSortFilter({ sortConfig, onSortChange }: TaskSortFilterProps
   };
 
   return (
-    <div className="flex items-center gap-4 mb-6">
+    <div className="flex items-center gap-4 mb-6" data-testid="tasks-sort-controls">
       <div className="flex items-center gap-2">
         <label htmlFor="sort-field" className="text-sm font-medium">
           Sortuj po:
@@ -44,6 +44,7 @@ export function TaskSortFilter({ sortConfig, onSortChange }: TaskSortFilterProps
         size="icon"
         onClick={toggleDirection}
         aria-label={sortConfig.direction === "asc" ? "Sortuj malejąco" : "Sortuj rosnąco"}
+        data-testid="tasks-sort-direction-toggle"
       >
         {sortConfig.direction === "asc" ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
       </Button>

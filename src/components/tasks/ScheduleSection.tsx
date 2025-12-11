@@ -32,7 +32,7 @@ export function ScheduleSection({
   dayHelperText,
 }: ScheduleSectionProps) {
   return (
-    <fieldset className="space-y-4">
+    <fieldset className="space-y-4" data-testid="task-schedule-section">
       <legend className="text-sm font-semibold text-muted-foreground">Harmonogram</legend>
 
       <IntervalPicker

@@ -16,7 +16,7 @@ export function TaskFormHeader({
   statusId,
 }: TaskFormHeaderProps) {
   return (
-    <header className="space-y-1">
+    <header className="space-y-1" data-testid="task-form-header">
       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Nowe zadanie</p>
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold text-foreground">{title}</h1>
@@ -35,6 +35,7 @@ export function TaskFormHeader({
                 ? "text-destructive"
                 : "text-muted-foreground/80"
           }`}
+          data-testid="task-form-status"
         >
           {status}
         </p>

@@ -10,9 +10,11 @@ interface TaskListHeaderProps {
  */
 export function TaskListHeader({ totalCount }: TaskListHeaderProps) {
   return (
-    <div className="mb-6">
-      <h1 className="text-3xl font-bold">Wszystkie zadania</h1>
-      <p className="text-muted-foreground mt-1">
+    <div className="mb-6" data-testid="tasks-page-header">
+      <h1 className="text-3xl font-bold" data-testid="tasks-page-title">
+        Wszystkie zadania
+      </h1>
+      <p className="text-muted-foreground mt-1" data-testid="tasks-total-count">
         Łącznie: {totalCount} {getTasksLabel(totalCount)}
       </p>
     </div>

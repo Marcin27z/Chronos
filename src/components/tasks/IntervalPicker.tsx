@@ -47,6 +47,7 @@ export function IntervalPicker({
           min={1}
           max={999}
           id={inputId}
+          data-testid="task-interval-value-input"
           value={value}
           onChange={(event) => onValueChange(Number(event.target.value))}
           className="w-24 rounded-md border border-border bg-input px-3 py-2 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/60"
@@ -55,7 +56,7 @@ export function IntervalPicker({
         />
 
         <Select value={unit} onValueChange={(selected) => onUnitChange(selected as IntervalUnit)}>
-          <SelectTrigger className="w-40 text-left" size="default">
+          <SelectTrigger className="w-40 text-left" size="default" data-testid="task-interval-unit-select">
             <SelectValue placeholder="Jednostka" />
           </SelectTrigger>
           <SelectContent>

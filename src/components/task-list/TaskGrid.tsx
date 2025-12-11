@@ -12,7 +12,7 @@ interface TaskGridProps {
  */
 export function TaskGrid({ tasks, onDelete }: TaskGridProps) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6" data-testid="tasks-grid">
       {tasks.map((task) => (
         <TaskListCard key={task.id} task={task} onDelete={onDelete} />
       ))}

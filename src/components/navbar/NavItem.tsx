@@ -26,6 +26,7 @@ export const NavItem = ({ item, isActive, onNavigate }: NavItemProps) => {
   return (
     <button
       type="button"
+      data-testid={`nav-item-${item.label.toLowerCase()}`}
       className={`flex items-center gap-2 px-4 py-2 rounded-md transition ${interactionClass}`}
       aria-current={isActive ? "page" : undefined}
       onClick={() => onNavigate(href)}

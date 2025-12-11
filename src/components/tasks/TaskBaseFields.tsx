@@ -27,7 +27,7 @@ export function TaskBaseFields({
   const descriptionError = errors.description;
 
   return (
-    <fieldset className="space-y-4">
+    <fieldset className="space-y-4" data-testid="task-base-fields">
       <legend className="text-sm font-semibold text-muted-foreground">Podstawowe informacje</legend>
 
       <div className="space-y-2">
@@ -36,6 +36,7 @@ export function TaskBaseFields({
         </label>
         <input
           id="task-title"
+          data-testid="task-title-input"
           type="text"
           className="w-full rounded-md border border-border bg-input px-3 py-2 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/60"
           placeholder="Co chcesz robić cyklicznie?"
@@ -59,6 +60,7 @@ export function TaskBaseFields({
         </label>
         <textarea
           id="task-description"
+          data-testid="task-description-input"
           className="min-h-[120px] w-full rounded-md border border-border bg-input px-3 py-2 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/60"
           placeholder="Dodaj dodatkowe informacje, np. kroki lub kontekst"
           value={description ?? ""}

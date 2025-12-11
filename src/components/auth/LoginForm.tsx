@@ -87,12 +87,13 @@ export function LoginForm({ initialStatus }: LoginFormProps) {
                 : "bg-primary/10 text-primary"
           }`}
           role="status"
+          data-testid="login-status"
         >
           {status.message}
         </div>
       )}
 
-      <form className="space-y-4" onSubmit={handleSubmit} noValidate>
+      <form className="space-y-4" onSubmit={handleSubmit} noValidate data-testid="login-form">
         <AuthInput
           id={`${baseId}-email`}
           label="Adres e-mail"
@@ -101,6 +102,7 @@ export function LoginForm({ initialStatus }: LoginFormProps) {
           onChange={handleChange("email")}
           error={isTouched && form.email === "" ? "E-mail jest wymagany" : undefined}
           placeholder="name@example.com"
+          data-testid="login-email-input"
         />
         <AuthInput
           id={`${baseId}-password`}
@@ -110,9 +112,10 @@ export function LoginForm({ initialStatus }: LoginFormProps) {
           onChange={handleChange("password")}
           error={isTouched && form.password === "" ? "Hasło jest wymagane" : undefined}
           placeholder="••••••••"
+          data-testid="login-password-input"
         />
 
-        <AuthButton type="submit" isLoading={isLoading}>
+        <AuthButton type="submit" isLoading={isLoading} data-testid="login-submit">
           Zaloguj się
         </AuthButton>
       </form>
