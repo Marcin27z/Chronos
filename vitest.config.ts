@@ -9,7 +9,7 @@ export default defineConfig({
     setupFiles: ["./src/tests/setup/vitest.setup.ts"],
     include: ["src/**/*.{test,spec}.{ts,tsx}", "tests/unit/**/*.{test,spec}.{ts,tsx}"],
     coverage: {
-      provider: "istanbul",
+      provider: "v8",
       reporter: ["text", "html"],
       exclude: ["dist", "node_modules", "tests/e2e/**"],
     },
