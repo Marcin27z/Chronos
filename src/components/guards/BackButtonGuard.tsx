@@ -17,8 +17,7 @@ interface BackButtonGuardProps {
   onCancel?: () => void;
 }
 
-const DEFAULT_WARNING =
-  "Masz niezapisane zmiany. Czy na pewno chcesz kontynuować i utracić postępy?";
+const DEFAULT_WARNING = "Masz niezapisane zmiany. Czy na pewno chcesz kontynuować i utracić postępy?";
 
 export const BackButtonGuard = ({
   hasUnsavedChanges,
@@ -124,4 +123,3 @@ export const BackButtonGuard = ({
     </Dialog>
   );
 };
-

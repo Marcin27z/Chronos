@@ -58,5 +58,3 @@ export const resolveBreadcrumbs = (path: string): BreadcrumbEntry[] => {
     { label: normalized.split("/").pop() || "Strona", isCurrent: true },
   ];
 };
-
-
