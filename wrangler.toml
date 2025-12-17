@@ -1,0 +1,19 @@
+# Cloudflare Workers/Pages configuration
+# This file is used for local development and can be used as a reference for Pages configuration
+
+name = "chronos"
+compatibility_date = "2024-12-11"
+
+# KV Namespace for sessions
+# In production, this should be configured in Cloudflare Dashboard under Pages → Settings → Environment variables
+# [[kv_namespaces]]
+# binding = "SESSION"
+# id = "your_kv_namespace_id"
+# preview_id = "your_preview_kv_namespace_id"
+
+# Environment variables for local development
+# In production, configure these in Cloudflare Dashboard
+[vars]
+# SUPABASE_URL will be set from Dashboard
+# SUPABASE_KEY will be set from Dashboard
+

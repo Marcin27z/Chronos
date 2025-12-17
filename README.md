@@ -31,7 +31,11 @@ The application addresses the problem where users have difficulty remembering ta
 
 ### CI/CD & Hosting
 - **[GitHub Actions](https://github.com/features/actions)** - CI/CD pipeline creation
-- **[DigitalOcean](https://www.digitalocean.com/)** - Application hosting via Docker containers
+- **[Cloudflare Pages](https://pages.cloudflare.com/)** - Application hosting with edge computing
+  - Automatic deployments from master branch
+  - Global CDN distribution
+  - Built-in SSL/TLS certificates
+  - See [Cloudflare Deployment Guide](docs/cloudflare-deployment.md) for setup details
 
 ## Getting Started Locally
 
@@ -63,7 +67,7 @@ npm install
 npm run dev
 ```
 
-5. Open your browser and navigate to `http://localhost:4321`
+5. Open your browser and navigate to `http://localhost:3000`
 
 ## Available Scripts
 
