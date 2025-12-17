@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
+    "build:cf": "cross-env CLOUDFLARE_BUILD=1 astro build",
     "preview": "astro preview",
     "astro": "astro",
     "lint": "eslint .",
@@ -43,6 +44,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@astrojs/node": "^9.5.1",
     "@eslint/compat": "1.2.7",
     "@eslint/js": "9.23.0",
     "@playwright/test": "^1.47.0",
@@ -53,6 +55,7 @@
     "@typescript-eslint/parser": "8.28.0",
     "@vitejs/plugin-react": "^4.0.0",
     "@vitest/coverage-v8": "^4.0.15",
+    "cross-env": "^7.0.3",
     "eslint": "9.23.0",
     "eslint-config-prettier": "10.1.1",
     "eslint-import-resolver-typescript": "4.2.5",
