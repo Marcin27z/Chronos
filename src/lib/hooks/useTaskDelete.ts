@@ -50,4 +50,3 @@ export function useTaskDelete(options: UseTaskDeleteOptions) {
     confirmDelete,
   };
 }
-
