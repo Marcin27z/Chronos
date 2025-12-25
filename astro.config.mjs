@@ -6,6 +6,7 @@ import sitemap from "@astrojs/sitemap";
 import tailwindcss from "@tailwindcss/vite";
 import cloudflare from "@astrojs/cloudflare";
 import node from "@astrojs/node";
+import process from "node:process";
 
 // Use Cloudflare adapter only in production builds (Cloudflare Pages)
 // For E2E tests and local preview, use Node adapter
