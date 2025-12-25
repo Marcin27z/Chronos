@@ -24,6 +24,7 @@ export default defineConfig({
   },
   vite: {
     plugins: [tailwindcss()],
+    envPrefix: ["PUBLIC_", "SUPABASE_"],
   },
   // Use Cloudflare adapter in production, Node adapter for local development/testing
   adapter: isCloudflare
