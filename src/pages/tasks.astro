@@ -1,11 +1,10 @@
 ---
 import AppLayout from "@/layouts/AppLayout.astro";
 import { TaskList } from "@/components/task-list/TaskList";
+import { getServerSessionWithProfile } from "@/lib/services/user.service";
 
 const supabase = Astro.locals.supabase;
-const {
-  data: { session },
-} = await supabase.auth.getSession();
+const { session, userProfile } = await getServerSessionWithProfile(supabase);
 
 if (!session) {
   return Astro.redirect("/login");
@@ -16,6 +15,6 @@ const token = session.access_token;
 export const prerender = false;
 ---
 
-<AppLayout title="Wszystkie zadania - Chronos">
+<AppLayout title="Wszystkie zadania - Chronos" userProfile={userProfile}>
   <TaskList client:load token={token} />
 </AppLayout>

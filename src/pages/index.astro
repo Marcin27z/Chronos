@@ -1,40 +1,20 @@
 ---
 import AppLayout from "@/layouts/AppLayout.astro";
 import { Dashboard } from "../components/dashboard/Dashboard";
+import { getServerSessionWithProfile } from "@/lib/services/user.service";
 
-// Sprawdzenie autentykacji użytkownika
 const supabase = Astro.locals.supabase;
-const {
-  data: { session },
-} = await supabase.auth.getSession();
+const { session, userProfile } = await getServerSessionWithProfile(supabase);
 
-// Przekierowanie do loginu jeśli użytkownik nie jest zalogowany
 if (!session) {
   return Astro.redirect("/login");
 }
 
-// Pobranie tokenu autoryzacyjnego
 const token = session.access_token;
 
-// Opcjonalne: Pobranie danych użytkownika dla personalizacji
-const {
-  data: { user },
-} = await supabase.auth.getUser();
-
-const userProfile =
-  user && user.email
-    ? {
-        id: user.id,
-        name: user.user_metadata?.name || user.email.split("@")[0],
-        email: user.email,
-        avatarUrl: user.user_metadata?.avatarUrl || user.user_metadata?.avatar_url,
-      }
-    : null;
-
-// Wyłączenie prerendering dla tej strony (wymaga SSR)
 export const prerender = false;
 ---
 
 <AppLayout title="Dashboard - Chronos" userProfile={userProfile}>
-  <Dashboard client:load token={token} userName={userProfile?.name ?? user?.email?.split("@")[0]} />
+  <Dashboard client:load token={token} userName={userProfile?.name} />
 </AppLayout>

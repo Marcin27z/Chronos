@@ -2,11 +2,10 @@
 import AppLayout from "@/layouts/AppLayout.astro";
 import { EditTaskView } from "@/components/tasks/EditTaskView";
 import { z } from "zod";
+import { getServerSessionWithProfile } from "@/lib/services/user.service";
 
 const supabase = Astro.locals.supabase;
-const {
-  data: { session },
-} = await supabase.auth.getSession();
+const { session, userProfile } = await getServerSessionWithProfile(supabase);
 
 // Weryfikacja sesji - redirect do login jeśli brak
 if (!session) {
@@ -61,7 +60,7 @@ try {
 export const prerender = false;
 ---
 
-<AppLayout title={`Edytuj: ${task.title} - Chronos`}>
+<AppLayout title={`Edytuj: ${task.title} - Chronos`} userProfile={userProfile}>
   <div class="flex min-h-[calc(100vh-4rem)] flex-col items-center justify-start px-4 py-12">
     <div class="w-full max-w-3xl">
       <EditTaskView client:load initialTask={task} token={token} />
