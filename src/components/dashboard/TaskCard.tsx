@@ -1,7 +1,7 @@
 import type { TaskWithDaysOverdueDTO, TaskWithDaysUntilDueDTO } from "@/types";
 import type { TaskCardVariant } from "@/lib/types/dashboard.viewmodel";
 import { Button } from "@/components/ui/button";
-import { Check, SkipForward, Loader2 } from "lucide-react";
+import { Check, SkipForward, Loader2, Pencil } from "lucide-react";
 
 /**
  * TaskCard Component
@@ -58,11 +58,21 @@ export function TaskCard({ task, variant, onComplete, onSkip, isProcessing = fal
         <div className="flex-1 min-w-0">
           <h3 className="text-lg font-semibold truncate">{task.title}</h3>
         </div>
-        <span
-          className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border whitespace-nowrap ${badgeClassName}`}
-        >
-          {getDaysBadge()}
-        </span>
+        <div className="flex items-center gap-2">
+          <span
+            className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border whitespace-nowrap ${badgeClassName}`}
+          >
+            {getDaysBadge()}
+          </span>
+          <a
+            href={`/tasks/${task.id}/edit`}
+            className="inline-flex items-center justify-center rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            aria-label={`Edytuj zadanie: ${task.title}`}
+            title="Edytuj zadanie"
+          >
+            <Pencil className="h-4 w-4" aria-hidden="true" />
+          </a>
+        </div>
       </div>
 
       {/* Opis (jeśli istnieje) */}

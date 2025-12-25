@@ -7,18 +7,62 @@ import { NextDueDatePreview } from "./NextDueDatePreview";
 import { FormActions } from "./FormActions";
 import { FormErrorsAlert } from "./FormErrorsAlert";
 import { FormSuccessAlert } from "./FormSuccessAlert";
-import { createTask, type TaskApiError } from "@/lib/api/tasks.api";
+import { createTask, updateTask, type TaskApiError } from "@/lib/api/tasks.api";
 import { useCreateTaskForm } from "@/lib/hooks/useCreateTaskForm";
+import { useEditTaskForm } from "@/lib/hooks/useEditTaskForm";
 import { BackButtonGuard } from "@/components/guards/BackButtonGuard";
-import type { CreateTaskViewModel, ValidationErrorDetail, ValidationState } from "@/types";
+import type { CreateTaskViewModel, ValidationErrorDetail, ValidationState, TaskDTO } from "@/types";
 
 interface TaskFormProps {
   token: string;
+  mode?: "create" | "edit";
+  initialValues?: Partial<CreateTaskViewModel>;
+  initialTask?: TaskDTO;
+  taskId?: string;
   onSubmit?: (values: CreateTaskViewModel) => Promise<void> | void;
   onCancel?: () => void;
 }
 
-export function TaskForm({ token, onSubmit, onCancel }: TaskFormProps) {
+export function TaskForm({
+  token,
+  mode = "create",
+  initialValues,
+  initialTask,
+  taskId,
+  onSubmit,
+  onCancel,
+}: TaskFormProps) {
+  // Wybór odpowiedniego hooka w zależności od trybu
+  const isEditMode = mode === "edit";
+
+  // Hook dla trybu create
+  const createFormHook = useCreateTaskForm({ initialValues });
+
+  // Hook dla trybu edit (tylko jeśli initialTask jest dostępne)
+  const editFormHook = useEditTaskForm(
+    initialTask
+      ? { initialTask }
+      : {
+          initialTask: {
+            id: "",
+            user_id: "",
+            title: "",
+            description: null,
+            interval_value: 1,
+            interval_unit: "weeks",
+            preferred_day_of_week: null,
+            next_due_date: new Date().toISOString(),
+            last_action_date: null,
+            last_action_type: null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        }
+  );
+
+  // Wybór właściwego hooka
+  const formHook = isEditMode && initialTask ? editFormHook : createFormHook;
+
   const {
     values,
     errors,
@@ -37,9 +81,10 @@ export function TaskForm({ token, onSubmit, onCancel }: TaskFormProps) {
     resetForm,
     applyFieldErrors,
     setGeneralErrorMessage,
-  } = useCreateTaskForm();
+  } = formHook;
 
   const [successMessage, setSuccessMessage] = React.useState<string | null>(null);
+  const [isSaved, setIsSaved] = React.useState(false);
   const redirectTimeoutRef = React.useRef<number | null>(null);
 
   const hasFieldErrors = Object.values(errors).some(Boolean);
@@ -88,15 +133,27 @@ export function TaskForm({ token, onSubmit, onCancel }: TaskFormProps) {
       event.preventDefault();
       setSuccessMessage(null);
       setGeneralErrorMessage(undefined);
+      setIsSaved(false);
 
       await submitForm({
         onSubmit: async (formValues) => {
-          await createTask(token, formValues);
-          setSuccessMessage("Zadanie zostało zapisane");
-          resetForm();
-          if (onSubmit) {
-            await onSubmit(formValues);
+          if (isEditMode && taskId) {
+            // Tryb edycji - wywołaj updateTask
+            await updateTask(taskId, token, formValues);
+            setSuccessMessage("Zadanie zostało zaktualizowane");
+          } else {
+            // Tryb tworzenia - wywołaj createTask
+            await createTask(token, formValues);
+            setSuccessMessage("Zadanie zostało zapisane");
+            resetForm();
           }
+
+          setIsSaved(true); // Wyłącz guard przed redirectem
+
+          if (onSubmit) {
+            await onSubmit(formValues as CreateTaskViewModel);
+          }
+
           redirectTimeoutRef.current = window.setTimeout(() => {
             window.location.assign("/tasks");
           }, 1200);
@@ -113,14 +170,16 @@ export function TaskForm({ token, onSubmit, onCancel }: TaskFormProps) {
               markValidationDetails(apiError.payload.details);
             }
 
-            return apiError.payload.error ?? "Nie udało się zapisać zadania";
+            return apiError.payload.error ?? `Nie udało się ${isEditMode ? "zaktualizować" : "zapisać"} zadania`;
           }
 
-          return error instanceof Error ? error.message : "Nie udało się zapisać zadania";
+          return error instanceof Error
+            ? error.message
+            : `Nie udało się ${isEditMode ? "zaktualizować" : "zapisać"} zadania`;
         },
       });
     },
-    [submitForm, token, resetForm, onSubmit, markValidationDetails, setGeneralErrorMessage]
+    [submitForm, token, resetForm, onSubmit, markValidationDetails, setGeneralErrorMessage, isEditMode, taskId]
   );
 
   const handleCancel = React.useCallback(() => {
@@ -139,7 +198,7 @@ export function TaskForm({ token, onSubmit, onCancel }: TaskFormProps) {
 
   return (
     <>
-      <BackButtonGuard hasUnsavedChanges={isDirty} />
+      <BackButtonGuard hasUnsavedChanges={isDirty && !isSaved} />
       <form
         className="space-y-6 rounded-xl border border-border bg-card/80 p-6 shadow-lg shadow-muted-foreground/20 backdrop-blur"
         onSubmit={handleSubmit}

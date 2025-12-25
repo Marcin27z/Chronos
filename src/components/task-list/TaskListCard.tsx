@@ -1,4 +1,4 @@
-import { Trash } from "lucide-react";
+import { Trash, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatDate, formatInterval, getDayOfWeekLabel } from "@/lib/utils/date-format.utils";
 import type { TaskDTO } from "@/types";
@@ -20,6 +20,14 @@ export function TaskListCard({ task, onDelete }: TaskListCardProps) {
           {task.title}
         </h3>
         <div className="flex gap-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
+          <a
+            href={`/tasks/${task.id}/edit`}
+            className="inline-flex items-center justify-center rounded-md h-9 w-9 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            aria-label="Edytuj zadanie"
+            title="Edytuj zadanie"
+          >
+            <Pencil className="h-4 w-4" />
+          </a>
           <Button
             variant="ghost"
             size="icon"

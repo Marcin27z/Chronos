@@ -459,3 +459,67 @@ export interface MobileMenuState {
  * Predefined breadcrumb configuration per route
  */
 export type BreadcrumbsMap = Record<string, BreadcrumbEntry[]>;
+
+// ============================================================================
+// Edit Task View Models
+// ============================================================================
+
+/**
+ * Alias dla EditTaskViewModel - identyczny z CreateTaskViewModel
+ */
+export type EditTaskViewModel = CreateTaskViewModel;
+
+/**
+ * Model ostrzeżenia o wpływie zmiany harmonogramu
+ */
+export interface ScheduleImpactWarningVM {
+  /**
+   * Czy nastąpiła zmiana w parametrach harmonogramu
+   */
+  hasChanges: boolean;
+
+  /**
+   * Tekstowa reprezentacja starego interwału (np. "3 miesiące")
+   */
+  oldInterval: string;
+
+  /**
+   * Tekstowa reprezentacja nowego interwału (np. "6 miesięcy")
+   */
+  newInterval: string;
+
+  /**
+   * Stara data next_due_date w formacie ISO
+   */
+  oldNextDueDate: string | null;
+
+  /**
+   * Nowa obliczona data next_due_date w formacie ISO (preview)
+   */
+  newNextDueDate: string | null;
+
+  /**
+   * Komunikat o wpływie zmian
+   */
+  impactMessage: string;
+}
+
+/**
+ * Model historii akcji zadania
+ */
+export interface TaskHistoryVM {
+  /**
+   * Data ostatniej akcji w formacie ISO
+   */
+  lastActionDate: string | null;
+
+  /**
+   * Typ ostatniej akcji ("completed" | "skipped")
+   */
+  lastActionType: ActionType | null;
+
+  /**
+   * Sformatowany tekst do wyświetlenia (np. "Ostatnio wykonane: 15 stycznia 2025")
+   */
+  displayText: string;
+}

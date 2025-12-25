@@ -1,0 +1,71 @@
+---
+import AppLayout from "@/layouts/AppLayout.astro";
+import { EditTaskView } from "@/components/tasks/EditTaskView";
+import { z } from "zod";
+
+const supabase = Astro.locals.supabase;
+const {
+  data: { session },
+} = await supabase.auth.getSession();
+
+// Weryfikacja sesji - redirect do login jeśli brak
+if (!session) {
+  const currentUrl = `/tasks/${Astro.params.id}/edit`;
+  return Astro.redirect(`/login?redirect=${encodeURIComponent(currentUrl)}`);
+}
+
+const token = session.access_token;
+
+// Pobranie taskId z parametrów URL
+const taskId = Astro.params.id;
+
+// Walidacja UUID taskId
+const uuidSchema = z.string().uuid();
+const validationResult = uuidSchema.safeParse(taskId);
+
+if (!validationResult.success) {
+  return Astro.redirect("/tasks?error=invalid_id&message=Nieprawidłowy+identyfikator+zadania");
+}
+
+// Pobranie danych zadania z API
+let task;
+try {
+  const response = await fetch(`${Astro.url.origin}/api/tasks/${taskId}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    credentials: "include",
+  });
+
+  if (response.status === 404) {
+    return Astro.redirect("/tasks?error=not_found&message=Zadanie+nie+istnieje");
+  }
+
+  if (response.status === 401) {
+    return Astro.redirect(`/login?redirect=${encodeURIComponent(`/tasks/${taskId}/edit`)}`);
+  }
+
+  if (!response.ok) {
+    console.error("Failed to fetch task:", response.status, response.statusText);
+    return Astro.redirect("/tasks?error=fetch_failed&message=Nie+udało+się+pobrać+zadania");
+  }
+
+  task = await response.json();
+} catch (error) {
+  console.error("Error fetching task:", error);
+  return Astro.redirect("/tasks?error=network_error&message=Błąd+połączenia");
+}
+
+export const prerender = false;
+---
+
+<AppLayout title={`Edytuj: ${task.title} - Chronos`}>
+  <div class="flex min-h-[calc(100vh-4rem)] flex-col items-center justify-start px-4 py-12">
+    <div class="w-full max-w-3xl">
+      <EditTaskView client:load initialTask={task} token={token} />
+    </div>
+  </div>
+</AppLayout>
+
