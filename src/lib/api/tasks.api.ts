@@ -5,6 +5,8 @@ import type {
   TaskDTO,
   ErrorDTO,
   ValidationErrorDTO,
+  CalculateNextDueDateCommand,
+  NextDueDateResponseDTO,
 } from "../../types";
 
 /**
@@ -101,13 +103,37 @@ export async function createTask(token: string, command: CreateTaskCommand): Pro
 /**
  * Aktualizuje istniejące zadanie
  */
-export async function updateTask(
-  taskId: string,
-  token: string,
-  command: UpdateTaskCommand
-): Promise<TaskDTO> {
+export async function updateTask(taskId: string, token: string, command: UpdateTaskCommand): Promise<TaskDTO> {
   const response = await fetch(`/api/tasks/${taskId}`, {
     method: "PUT",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(command),
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json()) as ErrorDTO | ValidationErrorDTO;
+    throw {
+      status: response.status,
+      payload,
+    } satisfies TaskApiError;
+  }
+
+  return response.json();
+}
+
+/**
+ * Oblicza następną datę wykonania zadania na podstawie interwału i preferowanego dnia tygodnia
+ * Endpoint użytkowy (utility) do podglądu daty w czasie rzeczywistym podczas tworzenia/edycji zadań
+ */
+export async function calculateNextDueDate(
+  token: string,
+  command: CalculateNextDueDateCommand
+): Promise<NextDueDateResponseDTO> {
+  const response = await fetch("/api/tasks/calculate-next-due-date", {
+    method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",

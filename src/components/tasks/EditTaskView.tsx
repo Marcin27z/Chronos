@@ -43,7 +43,7 @@ export function EditTaskView({ initialTask, token }: EditTaskViewProps) {
     resetForm,
     applyFieldErrors,
     setGeneralErrorMessage,
-  } = useEditTaskForm({ initialTask });
+  } = useEditTaskForm({ initialTask, token });
 
   const { isDialogOpen, isDeleting, deleteError, openDeleteDialog, closeDeleteDialog, confirmDelete } = useTaskDelete({
     taskId: initialTask.id,

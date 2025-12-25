@@ -1,6 +1,7 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { CreateTaskViewModel, IntervalUnit, NextDueDatePreviewModel, ValidationState } from "@/types";
+import { calculateNextDueDate } from "@/lib/api/tasks.api";
 
 const DEFAULT_VALUES: CreateTaskViewModel = {
   title: "",
@@ -12,6 +13,7 @@ const DEFAULT_VALUES: CreateTaskViewModel = {
 
 interface UseCreateTaskFormOptions {
   initialValues?: Partial<CreateTaskViewModel>;
+  token: string;
 }
 
 interface SubmitOptions {
@@ -126,7 +128,8 @@ function createMetaState(): Record<keyof CreateTaskViewModel, { touched: boolean
   };
 }
 
-export function useCreateTaskForm(options?: UseCreateTaskFormOptions) {
+export function useCreateTaskForm(options: UseCreateTaskFormOptions) {
+  const { token } = options;
   const mergedInitial = useMemo<CreateTaskViewModel>(
     () => ({ ...DEFAULT_VALUES, ...options?.initialValues }),
     [options?.initialValues]
@@ -137,29 +140,76 @@ export function useCreateTaskForm(options?: UseCreateTaskFormOptions) {
   const [meta, setMeta] = useState(() => createMetaState());
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [generalError, setGeneralError] = useState<string | undefined>(undefined);
+  const [nextDueDatePreview, setNextDueDatePreview] = useState<NextDueDatePreviewModel>({
+    nextDueDate: null,
+    description: "Uzupełnij interwał, aby zobaczyć podgląd",
+  });
 
   const isDirty = useMemo(() => {
     return JSON.stringify(values) !== JSON.stringify(mergedInitial);
   }, [values, mergedInitial]);
 
-  const nextDueDatePreview = useMemo<NextDueDatePreviewModel>(() => {
+  // Effect do obliczania nextDueDate przez API
+  useEffect(() => {
     const errorForInterval = validateField("interval_value", values.interval_value);
     if (errorForInterval) {
-      return { nextDueDate: null, description: "Uzupełnij interwał, aby zobaczyć podgląd" };
+      setNextDueDatePreview({
+        nextDueDate: null,
+        description: "Uzupełnij interwał, aby zobaczyć podgląd",
+      });
+      return;
     }
 
-    const dueDate = addInterval(new Date(), values.interval_value, values.interval_unit);
-    const formatter = new Intl.DateTimeFormat("pl-PL", {
-      weekday: "long",
-      day: "2-digit",
-      month: "long",
-    });
+    let cancelled = false;
 
-    return {
-      nextDueDate: dueDate.toISOString(),
-      description: `Następny termin: ${formatter.format(dueDate)}`,
+    const fetchNextDueDate = async () => {
+      try {
+        const result = await calculateNextDueDate(token, {
+          interval_value: values.interval_value,
+          interval_unit: values.interval_unit,
+          preferred_day_of_week: values.preferred_day_of_week,
+        });
+
+        if (cancelled) return;
+
+        const dueDate = new Date(result.next_due_date);
+        const formatter = new Intl.DateTimeFormat("pl-PL", {
+          weekday: "long",
+          day: "2-digit",
+          month: "long",
+        });
+
+        setNextDueDatePreview({
+          nextDueDate: result.next_due_date,
+          description: `Następny termin: ${formatter.format(dueDate)}`,
+        });
+      } catch {
+        if (cancelled) return;
+        // W przypadku błędu, używamy lokalnych obliczeń jako fallback
+        const dueDate = addInterval(new Date(), values.interval_value, values.interval_unit);
+        const formatter = new Intl.DateTimeFormat("pl-PL", {
+          weekday: "long",
+          day: "2-digit",
+          month: "long",
+        });
+
+        setNextDueDatePreview({
+          nextDueDate: dueDate.toISOString(),
+          description: `Następny termin: ${formatter.format(dueDate)}`,
+        });
+      }
     };
-  }, [values.interval_value, values.interval_unit]);
+
+    // Debounce - czekaj 300ms przed wywołaniem API
+    const timeoutId = setTimeout(() => {
+      void fetchNextDueDate();
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+    };
+  }, [values.interval_value, values.interval_unit, values.preferred_day_of_week, token]);
 
   const runValidation = useCallback(() => {
     const validation = validateForm(values);

@@ -244,7 +244,7 @@ export class TaskService {
    * @param preferredDayOfWeek - Optional preferred day (0=Sunday, 6=Saturday)
    * @returns ISO date string for next due date
    */
-  private calculateNextDueDate(
+  public calculateNextDueDate(
     intervalValue: number,
     intervalUnit: "days" | "weeks" | "months" | "years",
     preferredDayOfWeek: number | null

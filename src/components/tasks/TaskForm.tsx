@@ -36,12 +36,12 @@ export function TaskForm({
   const isEditMode = mode === "edit";
 
   // Hook dla trybu create
-  const createFormHook = useCreateTaskForm({ initialValues });
+  const createFormHook = useCreateTaskForm({ initialValues, token });
 
   // Hook dla trybu edit (tylko jeśli initialTask jest dostępne)
   const editFormHook = useEditTaskForm(
     initialTask
-      ? { initialTask }
+      ? { initialTask, token }
       : {
           initialTask: {
             id: "",
@@ -57,6 +57,7 @@ export function TaskForm({
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           },
+          token,
         }
   );
 
@@ -143,7 +144,8 @@ export function TaskForm({
             setSuccessMessage("Zadanie zostało zaktualizowane");
           } else {
             // Tryb tworzenia - wywołaj createTask
-            await createTask(token, formValues);
+            // formValues is validated by the form hook, so it's safe to use as CreateTaskCommand
+            await createTask(token, formValues as CreateTaskViewModel);
             setSuccessMessage("Zadanie zostało zapisane");
             resetForm();
           }

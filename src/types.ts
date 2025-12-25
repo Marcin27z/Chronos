@@ -106,6 +106,27 @@ export type UpdateTaskCommand = Partial<
   Pick<TablesUpdate<"tasks">, "title" | "description" | "interval_value" | "interval_unit" | "preferred_day_of_week">
 >;
 
+/**
+ * Command to calculate next due date
+ * Used for utility endpoint that provides date preview
+ */
+export interface CalculateNextDueDateCommand {
+  /**
+   * Interval value (1-999)
+   */
+  interval_value: number;
+
+  /**
+   * Interval unit: days, weeks, months, or years
+   */
+  interval_unit: IntervalUnit;
+
+  /**
+   * Preferred day of week (0=Sunday, 6=Saturday), null=no preference
+   */
+  preferred_day_of_week?: number | null;
+}
+
 // ============================================================================
 // Response DTOs - Tasks
 // ============================================================================
@@ -147,6 +168,16 @@ export type NextTaskDTO = Pick<Task, "id" | "title" | "next_due_date"> & {
    */
   days_until_due: number;
 };
+
+/**
+ * Response with calculated next due date
+ */
+export interface NextDueDateResponseDTO {
+  /**
+   * Calculated next due date in ISO format (YYYY-MM-DD)
+   */
+  next_due_date: string;
+}
 
 /**
  * Dashboard summary statistics

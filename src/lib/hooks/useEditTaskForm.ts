@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type {
   EditTaskViewModel,
@@ -11,9 +11,11 @@ import type {
   UpdateTaskCommand,
 } from "@/types";
 import { computeIntervalText, formatTaskHistory, computeDiff } from "@/lib/utils/task-edit.utils";
+import { calculateNextDueDate } from "@/lib/api/tasks.api";
 
 interface UseEditTaskFormOptions {
   initialTask: TaskDTO;
+  token: string;
 }
 
 interface SubmitOptions {
@@ -126,7 +128,7 @@ function createMetaState(): Record<keyof EditTaskViewModel, { touched: boolean }
 }
 
 export function useEditTaskForm(options: UseEditTaskFormOptions) {
-  const { initialTask } = options;
+  const { initialTask, token } = options;
 
   // Konwersja TaskDTO na EditTaskViewModel
   const initialValues = useMemo<EditTaskViewModel>(
@@ -145,11 +147,77 @@ export function useEditTaskForm(options: UseEditTaskFormOptions) {
   const [meta, setMeta] = useState(() => createMetaState());
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [generalError, setGeneralError] = useState<string | undefined>(undefined);
+  const [nextDueDatePreview, setNextDueDatePreview] = useState<NextDueDatePreviewModel>({
+    nextDueDate: null,
+    description: "Uzupełnij interwał, aby zobaczyć podgląd",
+  });
 
   // Obliczanie isDirty
   const isDirty = useMemo(() => {
     return JSON.stringify(values) !== JSON.stringify(initialValues);
   }, [values, initialValues]);
+
+  // Effect do obliczania nextDueDate przez API
+  useEffect(() => {
+    const errorForInterval = validateField("interval_value", values.interval_value);
+    if (errorForInterval) {
+      setNextDueDatePreview({
+        nextDueDate: null,
+        description: "Uzupełnij interwał, aby zobaczyć podgląd",
+      });
+      return;
+    }
+
+    let cancelled = false;
+
+    const fetchNextDueDate = async () => {
+      try {
+        const result = await calculateNextDueDate(token, {
+          interval_value: values.interval_value,
+          interval_unit: values.interval_unit,
+          preferred_day_of_week: values.preferred_day_of_week,
+        });
+
+        if (cancelled) return;
+
+        const dueDate = new Date(result.next_due_date);
+        const formatter = new Intl.DateTimeFormat("pl-PL", {
+          weekday: "long",
+          day: "2-digit",
+          month: "long",
+        });
+
+        setNextDueDatePreview({
+          nextDueDate: result.next_due_date,
+          description: `Następny termin: ${formatter.format(dueDate)}`,
+        });
+      } catch {
+        if (cancelled) return;
+        // W przypadku błędu, używamy lokalnych obliczeń jako fallback
+        const dueDate = addInterval(new Date(), values.interval_value, values.interval_unit);
+        const formatter = new Intl.DateTimeFormat("pl-PL", {
+          weekday: "long",
+          day: "2-digit",
+          month: "long",
+        });
+
+        setNextDueDatePreview({
+          nextDueDate: dueDate.toISOString(),
+          description: `Następny termin: ${formatter.format(dueDate)}`,
+        });
+      }
+    };
+
+    // Debounce - czekaj 300ms przed wywołaniem API
+    const timeoutId = setTimeout(() => {
+      void fetchNextDueDate();
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+    };
+  }, [values.interval_value, values.interval_unit, values.preferred_day_of_week, token]);
 
   // Obliczanie scheduleImpact
   const scheduleImpact = useMemo<ScheduleImpactWarningVM>(() => {
@@ -170,48 +238,20 @@ export function useEditTaskForm(options: UseEditTaskFormOptions) {
     const oldInterval = computeIntervalText(initialTask.interval_value, initialTask.interval_unit);
     const newInterval = computeIntervalText(values.interval_value, values.interval_unit);
 
-    // Oblicz nową datę next_due_date (przewidywanie)
-    const errorForInterval = validateField("interval_value", values.interval_value);
-    let newNextDueDate: string | null = null;
-    if (!errorForInterval) {
-      const calculatedDate = addInterval(new Date(), values.interval_value, values.interval_unit);
-      newNextDueDate = calculatedDate.toISOString();
-    }
-
     return {
       hasChanges: true,
       oldInterval,
       newInterval,
       oldNextDueDate: initialTask.next_due_date,
-      newNextDueDate,
+      newNextDueDate: nextDueDatePreview.nextDueDate,
       impactMessage: "Zmiana harmonogramu wpłynie na wszystkie przyszłe wystąpienia zadania.",
     };
-  }, [values.interval_value, values.interval_unit, initialTask]);
+  }, [values.interval_value, values.interval_unit, initialTask, nextDueDatePreview.nextDueDate]);
 
   // Formatowanie historii zadania
   const taskHistory = useMemo<TaskHistoryVM>(() => {
     return formatTaskHistory(initialTask);
   }, [initialTask]);
-
-  // Obliczanie nextDueDatePreview
-  const nextDueDatePreview = useMemo<NextDueDatePreviewModel>(() => {
-    const errorForInterval = validateField("interval_value", values.interval_value);
-    if (errorForInterval) {
-      return { nextDueDate: null, description: "Uzupełnij interwał, aby zobaczyć podgląd" };
-    }
-
-    const dueDate = addInterval(new Date(), values.interval_value, values.interval_unit);
-    const formatter = new Intl.DateTimeFormat("pl-PL", {
-      weekday: "long",
-      day: "2-digit",
-      month: "long",
-    });
-
-    return {
-      nextDueDate: dueDate.toISOString(),
-      description: `Następny termin: ${formatter.format(dueDate)}`,
-    };
-  }, [values.interval_value, values.interval_unit]);
 
   const runValidation = useCallback(() => {
     const validation = validateForm(values);
