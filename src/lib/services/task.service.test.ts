@@ -1686,3 +1686,649 @@ describe("TaskService.getTasks", () => {
     });
   });
 });
+
+describe("TaskService.getTaskById", () => {
+  const userId = "user-123";
+  const taskId = "550e8400-e29b-41d4-a716-446655440000";
+
+  interface SupabaseQueryResponse {
+    data?: TaskDTO | null;
+    error?: { message: string } | null;
+  }
+
+  const createMockSupabaseForGetTaskById = (response: SupabaseQueryResponse) => {
+    const singleMock = vi.fn().mockResolvedValue(response);
+    const eqUserIdMock = vi.fn(() => ({ single: singleMock }));
+    const eqTaskIdMock = vi.fn(() => ({ eq: eqUserIdMock }));
+    const selectMock = vi.fn(() => ({ eq: eqTaskIdMock }));
+    const fromMock = vi.fn(() => ({ select: selectMock }));
+
+    const supabase = {
+      from: fromMock,
+    } as unknown as SupabaseServerClient;
+
+    return {
+      supabase,
+      fromMock,
+      selectMock,
+      eqTaskIdMock,
+      eqUserIdMock,
+      singleMock,
+    };
+  };
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe("Happy path scenarios", () => {
+    it("retrieves task successfully when task exists and belongs to user", async () => {
+      // Arrange
+      const task: TaskDTO = {
+        id: taskId,
+        user_id: userId,
+        title: "Weekly Review",
+        description: "Review weekly progress",
+        interval_value: 1,
+        interval_unit: "weeks",
+        preferred_day_of_week: 1,
+        next_due_date: "2025-01-15",
+        last_action_date: "2025-01-08",
+        last_action_type: "completed",
+        created_at: "2025-01-01T00:00:00Z",
+        updated_at: "2025-01-08T00:00:00Z",
+      };
+
+      const { supabase, eqTaskIdMock, eqUserIdMock, singleMock } = createMockSupabaseForGetTaskById({ data: task });
+      const service = new TaskService(supabase);
+
+      // Act
+      const result = await service.getTaskById(userId, taskId);
+
+      // Assert
+      expect(result).toEqual(task);
+      expect(eqTaskIdMock).toHaveBeenCalledWith("id", taskId);
+      expect(eqUserIdMock).toHaveBeenCalledWith("user_id", userId);
+      expect(singleMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("retrieves task with minimal fields (null optional fields)", async () => {
+      // Arrange
+      const task: TaskDTO = {
+        id: taskId,
+        user_id: userId,
+        title: "Daily Check",
+        description: null,
+        interval_value: 1,
+        interval_unit: "days",
+        preferred_day_of_week: null,
+        next_due_date: "2025-01-10",
+        last_action_date: null,
+        last_action_type: null,
+        created_at: "2025-01-01T00:00:00Z",
+        updated_at: "2025-01-01T00:00:00Z",
+      };
+
+      const { supabase } = createMockSupabaseForGetTaskById({ data: task });
+      const service = new TaskService(supabase);
+
+      // Act
+      const result = await service.getTaskById(userId, taskId);
+
+      // Assert
+      expect(result).toEqual(task);
+      expect(result.description).toBeNull();
+      expect(result.preferred_day_of_week).toBeNull();
+      expect(result.last_action_date).toBeNull();
+      expect(result.last_action_type).toBeNull();
+    });
+
+    it("retrieves task with all fields populated", async () => {
+      // Arrange
+      const task: TaskDTO = {
+        id: taskId,
+        user_id: userId,
+        title: "Complete Task",
+        description: "Full description with details",
+        interval_value: 2,
+        interval_unit: "months",
+        preferred_day_of_week: 5,
+        next_due_date: "2025-03-15",
+        last_action_date: "2025-01-15",
+        last_action_type: "skipped",
+        created_at: "2025-01-01T00:00:00Z",
+        updated_at: "2025-01-15T00:00:00Z",
+      };
+
+      const { supabase } = createMockSupabaseForGetTaskById({ data: task });
+      const service = new TaskService(supabase);
+
+      // Act
+      const result = await service.getTaskById(userId, taskId);
+
+      // Assert
+      expect(result).toEqual(task);
+      expect(result.description).toBe("Full description with details");
+      expect(result.preferred_day_of_week).toBe(5);
+      expect(result.last_action_date).toBe("2025-01-15");
+      expect(result.last_action_type).toBe("skipped");
+    });
+  });
+
+  describe("User isolation and authorization", () => {
+    it("applies both id and user_id filters to ensure user isolation", async () => {
+      // Arrange
+      const task: TaskDTO = {
+        id: taskId,
+        user_id: userId,
+        title: "User's Task",
+        description: null,
+        interval_value: 1,
+        interval_unit: "days",
+        preferred_day_of_week: null,
+        next_due_date: "2025-01-10",
+        last_action_date: null,
+        last_action_type: null,
+        created_at: "2025-01-01T00:00:00Z",
+        updated_at: "2025-01-01T00:00:00Z",
+      };
+
+      const { supabase, eqTaskIdMock, eqUserIdMock } = createMockSupabaseForGetTaskById({ data: task });
+      const service = new TaskService(supabase);
+
+      // Act
+      await service.getTaskById(userId, taskId);
+
+      // Assert
+      expect(eqTaskIdMock).toHaveBeenCalledWith("id", taskId);
+      expect(eqUserIdMock).toHaveBeenCalledWith("user_id", userId);
+      // Verify call order: eq("id") is called before eq("user_id")
+      expect(eqTaskIdMock).toHaveBeenCalled();
+      expect(eqUserIdMock).toHaveBeenCalled();
+    });
+
+    it("throws error when task belongs to different user", async () => {
+      // Arrange
+      const differentUserId = "user-456";
+      const { supabase } = createMockSupabaseForGetTaskById({
+        data: null,
+        error: { message: "No rows returned" },
+      });
+      const service = new TaskService(supabase);
+
+      // Act & Assert
+      await expect(service.getTaskById(differentUserId, taskId)).rejects.toThrow(
+        "Task not found or does not belong to user"
+      );
+    });
+
+    it("throws error when task exists but query returns null data (wrong user)", async () => {
+      // Arrange
+      const { supabase } = createMockSupabaseForGetTaskById({ data: null, error: null });
+      const service = new TaskService(supabase);
+
+      // Act & Assert
+      await expect(service.getTaskById(userId, taskId)).rejects.toThrow("Task not found or does not belong to user");
+    });
+  });
+
+  describe("Error handling", () => {
+    it("throws error with descriptive message when task does not exist", async () => {
+      // Arrange
+      const nonExistentTaskId = "00000000-0000-0000-0000-000000000000";
+      const { supabase } = createMockSupabaseForGetTaskById({
+        data: null,
+        error: { message: "No rows returned" },
+      });
+      const service = new TaskService(supabase);
+
+      // Act & Assert
+      await expect(service.getTaskById(userId, nonExistentTaskId)).rejects.toThrow(
+        "Task not found or does not belong to user"
+      );
+    });
+
+    it("throws error when Supabase returns database error", async () => {
+      // Arrange
+      const errorMessage = "connection timeout";
+      const { supabase } = createMockSupabaseForGetTaskById({
+        data: null,
+        error: { message: errorMessage },
+      });
+      const service = new TaskService(supabase);
+
+      // Act & Assert
+      await expect(service.getTaskById(userId, taskId)).rejects.toThrow("Task not found or does not belong to user");
+    });
+
+    it("throws error when Supabase returns error with null data", async () => {
+      // Arrange
+      const { supabase } = createMockSupabaseForGetTaskById({
+        data: null,
+        error: { message: "Query execution failed" },
+      });
+      const service = new TaskService(supabase);
+
+      // Act & Assert
+      await expect(service.getTaskById(userId, taskId)).rejects.toThrow("Task not found or does not belong to user");
+    });
+
+    it("throws error when data is undefined", async () => {
+      // Arrange
+      const { supabase } = createMockSupabaseForGetTaskById({ data: undefined, error: null });
+      const service = new TaskService(supabase);
+
+      // Act & Assert
+      await expect(service.getTaskById(userId, taskId)).rejects.toThrow("Task not found or does not belong to user");
+    });
+
+    it("handles error object with null message", async () => {
+      // Arrange
+      const { supabase } = createMockSupabaseForGetTaskById({
+        data: null,
+        error: { message: null as unknown as string },
+      });
+      const service = new TaskService(supabase);
+
+      // Act & Assert
+      await expect(service.getTaskById(userId, taskId)).rejects.toThrow("Task not found or does not belong to user");
+    });
+  });
+
+  describe("Query chain verification", () => {
+    it("calls from('tasks') with correct table name", async () => {
+      // Arrange
+      const task: TaskDTO = {
+        id: taskId,
+        user_id: userId,
+        title: "Test Task",
+        description: null,
+        interval_value: 1,
+        interval_unit: "days",
+        preferred_day_of_week: null,
+        next_due_date: "2025-01-10",
+        last_action_date: null,
+        last_action_type: null,
+        created_at: "2025-01-01T00:00:00Z",
+        updated_at: "2025-01-01T00:00:00Z",
+      };
+
+      const { supabase, fromMock } = createMockSupabaseForGetTaskById({ data: task });
+      const service = new TaskService(supabase);
+
+      // Act
+      await service.getTaskById(userId, taskId);
+
+      // Assert
+      expect(fromMock).toHaveBeenCalledWith("tasks");
+    });
+
+    it("calls select('*') to retrieve all columns", async () => {
+      // Arrange
+      const task: TaskDTO = {
+        id: taskId,
+        user_id: userId,
+        title: "Test Task",
+        description: null,
+        interval_value: 1,
+        interval_unit: "days",
+        preferred_day_of_week: null,
+        next_due_date: "2025-01-10",
+        last_action_date: null,
+        last_action_type: null,
+        created_at: "2025-01-01T00:00:00Z",
+        updated_at: "2025-01-01T00:00:00Z",
+      };
+
+      const { supabase, selectMock } = createMockSupabaseForGetTaskById({ data: task });
+      const service = new TaskService(supabase);
+
+      // Act
+      await service.getTaskById(userId, taskId);
+
+      // Assert
+      expect(selectMock).toHaveBeenCalledWith("*");
+    });
+
+    it("calls single() to expect exactly one result", async () => {
+      // Arrange
+      const task: TaskDTO = {
+        id: taskId,
+        user_id: userId,
+        title: "Test Task",
+        description: null,
+        interval_value: 1,
+        interval_unit: "days",
+        preferred_day_of_week: null,
+        next_due_date: "2025-01-10",
+        last_action_date: null,
+        last_action_type: null,
+        created_at: "2025-01-01T00:00:00Z",
+        updated_at: "2025-01-01T00:00:00Z",
+      };
+
+      const { supabase, singleMock } = createMockSupabaseForGetTaskById({ data: task });
+      const service = new TaskService(supabase);
+
+      // Act
+      await service.getTaskById(userId, taskId);
+
+      // Assert
+      expect(singleMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("Return value validation", () => {
+    it("returns complete TaskDTO with all required fields", async () => {
+      // Arrange
+      const task: TaskDTO = {
+        id: taskId,
+        user_id: userId,
+        title: "Complete Task",
+        description: "Description",
+        interval_value: 3,
+        interval_unit: "weeks",
+        preferred_day_of_week: 2,
+        next_due_date: "2025-02-15",
+        last_action_date: "2025-01-25",
+        last_action_type: "completed",
+        created_at: "2025-01-01T00:00:00Z",
+        updated_at: "2025-01-25T00:00:00Z",
+      };
+
+      const { supabase } = createMockSupabaseForGetTaskById({ data: task });
+      const service = new TaskService(supabase);
+
+      // Act
+      const result = await service.getTaskById(userId, taskId);
+
+      // Assert
+      expect(result).toHaveProperty("id");
+      expect(result).toHaveProperty("user_id");
+      expect(result).toHaveProperty("title");
+      expect(result).toHaveProperty("description");
+      expect(result).toHaveProperty("interval_value");
+      expect(result).toHaveProperty("interval_unit");
+      expect(result).toHaveProperty("preferred_day_of_week");
+      expect(result).toHaveProperty("next_due_date");
+      expect(result).toHaveProperty("last_action_date");
+      expect(result).toHaveProperty("last_action_type");
+      expect(result).toHaveProperty("created_at");
+      expect(result).toHaveProperty("updated_at");
+      expect(result).toEqual(task);
+    });
+
+    it("returns TaskDTO with correct data types", async () => {
+      // Arrange
+      const task: TaskDTO = {
+        id: taskId,
+        user_id: userId,
+        title: "Type Test",
+        description: "Description",
+        interval_value: 5,
+        interval_unit: "months",
+        preferred_day_of_week: 4,
+        next_due_date: "2025-06-01",
+        last_action_date: "2025-01-01",
+        last_action_type: "skipped",
+        created_at: "2025-01-01T00:00:00Z",
+        updated_at: "2025-01-01T00:00:00Z",
+      };
+
+      const { supabase } = createMockSupabaseForGetTaskById({ data: task });
+      const service = new TaskService(supabase);
+
+      // Act
+      const result = await service.getTaskById(userId, taskId);
+
+      // Assert
+      expect(typeof result.id).toBe("string");
+      expect(typeof result.user_id).toBe("string");
+      expect(typeof result.title).toBe("string");
+      expect(typeof result.interval_value).toBe("number");
+      expect(typeof result.interval_unit).toBe("string");
+      expect(typeof result.next_due_date).toBe("string");
+      expect(result.preferred_day_of_week).toBeTypeOf("number");
+      expect(result.last_action_type).toBeTypeOf("string");
+    });
+  });
+
+  describe("Edge cases and boundary conditions", () => {
+    it("handles task with maximum interval value", async () => {
+      // Arrange
+      const task: TaskDTO = {
+        id: taskId,
+        user_id: userId,
+        title: "Max Interval Task",
+        description: null,
+        interval_value: 999,
+        interval_unit: "days",
+        preferred_day_of_week: null,
+        next_due_date: "2027-09-27",
+        last_action_date: null,
+        last_action_type: null,
+        created_at: "2025-01-01T00:00:00Z",
+        updated_at: "2025-01-01T00:00:00Z",
+      };
+
+      const { supabase } = createMockSupabaseForGetTaskById({ data: task });
+      const service = new TaskService(supabase);
+
+      // Act
+      const result = await service.getTaskById(userId, taskId);
+
+      // Assert
+      expect(result.interval_value).toBe(999);
+    });
+
+    it("handles task with minimum interval value", async () => {
+      // Arrange
+      const task: TaskDTO = {
+        id: taskId,
+        user_id: userId,
+        title: "Min Interval Task",
+        description: null,
+        interval_value: 1,
+        interval_unit: "days",
+        preferred_day_of_week: null,
+        next_due_date: "2025-01-02",
+        last_action_date: null,
+        last_action_type: null,
+        created_at: "2025-01-01T00:00:00Z",
+        updated_at: "2025-01-01T00:00:00Z",
+      };
+
+      const { supabase } = createMockSupabaseForGetTaskById({ data: task });
+      const service = new TaskService(supabase);
+
+      // Act
+      const result = await service.getTaskById(userId, taskId);
+
+      // Assert
+      expect(result.interval_value).toBe(1);
+    });
+
+    it("handles all interval unit types", async () => {
+      // Arrange
+      const units: ("days" | "weeks" | "months" | "years")[] = ["days", "weeks", "months", "years"];
+
+      for (const unit of units) {
+        const task: TaskDTO = {
+          id: taskId,
+          user_id: userId,
+          title: `Task with ${unit}`,
+          description: null,
+          interval_value: 1,
+          interval_unit: unit,
+          preferred_day_of_week: null,
+          next_due_date: "2025-01-10",
+          last_action_date: null,
+          last_action_type: null,
+          created_at: "2025-01-01T00:00:00Z",
+          updated_at: "2025-01-01T00:00:00Z",
+        };
+
+        const { supabase } = createMockSupabaseForGetTaskById({ data: task });
+        const service = new TaskService(supabase);
+
+        // Act
+        const result = await service.getTaskById(userId, taskId);
+
+        // Assert
+        expect(result.interval_unit).toBe(unit);
+      }
+    });
+
+    it("handles all preferred day of week values (0-6)", async () => {
+      // Arrange
+      for (let day = 0; day <= 6; day++) {
+        const task: TaskDTO = {
+          id: taskId,
+          user_id: userId,
+          title: `Task for day ${day}`,
+          description: null,
+          interval_value: 1,
+          interval_unit: "weeks",
+          preferred_day_of_week: day,
+          next_due_date: "2025-01-10",
+          last_action_date: null,
+          last_action_type: null,
+          created_at: "2025-01-01T00:00:00Z",
+          updated_at: "2025-01-01T00:00:00Z",
+        };
+
+        const { supabase } = createMockSupabaseForGetTaskById({ data: task });
+        const service = new TaskService(supabase);
+
+        // Act
+        const result = await service.getTaskById(userId, taskId);
+
+        // Assert
+        expect(result.preferred_day_of_week).toBe(day);
+      }
+    });
+
+    it("handles both action types (completed and skipped)", async () => {
+      // Arrange
+      const actionTypes: ("completed" | "skipped")[] = ["completed", "skipped"];
+
+      for (const actionType of actionTypes) {
+        const task: TaskDTO = {
+          id: taskId,
+          user_id: userId,
+          title: `Task with ${actionType} action`,
+          description: null,
+          interval_value: 1,
+          interval_unit: "days",
+          preferred_day_of_week: null,
+          next_due_date: "2025-01-10",
+          last_action_date: "2025-01-09",
+          last_action_type: actionType,
+          created_at: "2025-01-01T00:00:00Z",
+          updated_at: "2025-01-09T00:00:00Z",
+        };
+
+        const { supabase } = createMockSupabaseForGetTaskById({ data: task });
+        const service = new TaskService(supabase);
+
+        // Act
+        const result = await service.getTaskById(userId, taskId);
+
+        // Assert
+        expect(result.last_action_type).toBe(actionType);
+      }
+    });
+
+    it("handles UUID format for taskId parameter", async () => {
+      // Arrange
+      const validUuid = "123e4567-e89b-12d3-a456-426614174000";
+      const task: TaskDTO = {
+        id: validUuid,
+        user_id: userId,
+        title: "UUID Test Task",
+        description: null,
+        interval_value: 1,
+        interval_unit: "days",
+        preferred_day_of_week: null,
+        next_due_date: "2025-01-10",
+        last_action_date: null,
+        last_action_type: null,
+        created_at: "2025-01-01T00:00:00Z",
+        updated_at: "2025-01-01T00:00:00Z",
+      };
+
+      const { supabase, eqTaskIdMock } = createMockSupabaseForGetTaskById({ data: task });
+      const service = new TaskService(supabase);
+
+      // Act
+      await service.getTaskById(userId, validUuid);
+
+      // Assert
+      expect(eqTaskIdMock).toHaveBeenCalledWith("id", validUuid);
+    });
+  });
+
+  describe("Business rules validation", () => {
+    it("ensures user can only access their own tasks", async () => {
+      // Arrange
+      const ownerUserId = "user-owner";
+      const unauthorizedUserId = "user-unauthorized";
+      const task: TaskDTO = {
+        id: taskId,
+        user_id: ownerUserId,
+        title: "Owner's Task",
+        description: null,
+        interval_value: 1,
+        interval_unit: "days",
+        preferred_day_of_week: null,
+        next_due_date: "2025-01-10",
+        last_action_date: null,
+        last_action_type: null,
+        created_at: "2025-01-01T00:00:00Z",
+        updated_at: "2025-01-01T00:00:00Z",
+      };
+
+      // First call: owner can access
+      const { supabase: ownerSupabase } = createMockSupabaseForGetTaskById({ data: task });
+      const ownerService = new TaskService(ownerSupabase);
+      await expect(ownerService.getTaskById(ownerUserId, taskId)).resolves.toEqual(task);
+
+      // Second call: unauthorized user cannot access
+      const { supabase: unauthorizedSupabase } = createMockSupabaseForGetTaskById({
+        data: null,
+        error: { message: "No rows returned" },
+      });
+      const unauthorizedService = new TaskService(unauthorizedSupabase);
+      await expect(unauthorizedService.getTaskById(unauthorizedUserId, taskId)).rejects.toThrow(
+        "Task not found or does not belong to user"
+      );
+    });
+
+    it("throws same error message for non-existent task and unauthorized access", async () => {
+      // Arrange
+      const nonExistentTaskId = "00000000-0000-0000-0000-000000000000";
+      const unauthorizedTaskId = "11111111-1111-1111-1111-111111111111";
+
+      // Non-existent task
+      const { supabase: nonExistentSupabase } = createMockSupabaseForGetTaskById({
+        data: null,
+        error: { message: "No rows returned" },
+      });
+      const nonExistentService = new TaskService(nonExistentSupabase);
+
+      // Unauthorized access
+      const { supabase: unauthorizedSupabase } = createMockSupabaseForGetTaskById({
+        data: null,
+        error: { message: "No rows returned" },
+      });
+      const unauthorizedService = new TaskService(unauthorizedSupabase);
+
+      // Act & Assert
+      const nonExistentError = await nonExistentService.getTaskById(userId, nonExistentTaskId).catch((e) => e);
+      const unauthorizedError = await unauthorizedService.getTaskById(userId, unauthorizedTaskId).catch((e) => e);
+
+      expect(nonExistentError.message).toBe("Task not found or does not belong to user");
+      expect(unauthorizedError.message).toBe("Task not found or does not belong to user");
+    });
+  });
+});
