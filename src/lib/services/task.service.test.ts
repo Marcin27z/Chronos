@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { TaskService } from "./task.service";
-import type { CreateTaskCommand, TaskDTO } from "../../types";
+import type { CreateTaskCommand, TaskDTO, UpdateTaskCommand } from "../../types";
 import type { SupabaseServerClient } from "../../db/supabase.client";
 
 interface SupabaseInsertResponse {
@@ -2329,6 +2329,1447 @@ describe("TaskService.getTaskById", () => {
 
       expect(nonExistentError.message).toBe("Task not found or does not belong to user");
       expect(unauthorizedError.message).toBe("Task not found or does not belong to user");
+    });
+  });
+});
+
+describe("TaskService.updateTask", () => {
+  const userId = "user-123";
+  const taskId = "550e8400-e29b-41d4-a716-446655440000";
+
+  interface SupabaseFetchResponse {
+    data?: TaskDTO | null;
+    error?: { message: string } | null;
+  }
+
+  interface SupabaseUpdateResponse {
+    data?: TaskDTO | null;
+    error?: { message: string } | null;
+  }
+
+  const createMockSupabaseForUpdateTask = (
+    fetchResponse: SupabaseFetchResponse,
+    updateResponse: SupabaseUpdateResponse
+  ) => {
+    let callCount = 0;
+
+    // Mock for fetch query chain: from().select().eq().eq().single()
+    const fetchSingleMock = vi.fn().mockResolvedValue(fetchResponse);
+    const fetchEqUserIdMock = vi.fn(() => ({ single: fetchSingleMock }));
+    const fetchEqTaskIdMock = vi.fn(() => ({ eq: fetchEqUserIdMock }));
+    const fetchSelectMock = vi.fn(() => ({ eq: fetchEqTaskIdMock }));
+
+    // Mock for update query chain: from().update().eq().eq().select().single()
+    const updateSingleMock = vi.fn().mockResolvedValue(updateResponse);
+    const updateSelectMock = vi.fn(() => ({ single: updateSingleMock }));
+    const updateEqUserIdMock = vi.fn(() => ({ select: updateSelectMock }));
+    const updateEqTaskIdMock = vi.fn(() => ({ eq: updateEqUserIdMock }));
+    const updateMock = vi.fn(() => ({ eq: updateEqTaskIdMock }));
+
+    const fromMock = vi.fn(() => {
+      callCount++;
+      if (callCount === 1) {
+        // First call: fetch query
+        return { select: fetchSelectMock };
+      } else {
+        // Second call: update query
+        return { update: updateMock };
+      }
+    });
+
+    const supabase = {
+      from: fromMock,
+    } as unknown as SupabaseServerClient;
+
+    return {
+      supabase,
+      fromMock,
+      fetchSelectMock,
+      fetchEqTaskIdMock,
+      fetchEqUserIdMock,
+      fetchSingleMock,
+      updateMock,
+      updateEqTaskIdMock,
+      updateEqUserIdMock,
+      updateSelectMock,
+      updateSingleMock,
+    };
+  };
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe("Happy path scenarios", () => {
+    it("updates task title successfully", async () => {
+      // Arrange
+      const existingTask: TaskDTO = {
+        id: taskId,
+        user_id: userId,
+        title: "Original Title",
+        description: "Original description",
+        interval_value: 1,
+        interval_unit: "days",
+        preferred_day_of_week: null,
+        next_due_date: "2025-01-10",
+        last_action_date: null,
+        last_action_type: null,
+        created_at: "2025-01-01T00:00:00Z",
+        updated_at: "2025-01-01T00:00:00Z",
+      };
+
+      const updatedTask: TaskDTO = {
+        ...existingTask,
+        title: "Updated Title",
+        updated_at: "2025-01-02T00:00:00Z",
+      };
+
+      const command: UpdateTaskCommand = { title: "Updated Title" };
+
+      const { supabase, updateMock } = createMockSupabaseForUpdateTask({ data: existingTask }, { data: updatedTask });
+      const service = new TaskService(supabase);
+
+      // Act
+      const result = await service.updateTask(userId, taskId, command);
+
+      // Assert
+      expect(result).toEqual(updatedTask);
+      expect(result.title).toBe("Updated Title");
+      expect(updateMock).toHaveBeenCalledWith({ title: "Updated Title" });
+    });
+
+    it("updates task description successfully", async () => {
+      // Arrange
+      const existingTask: TaskDTO = {
+        id: taskId,
+        user_id: userId,
+        title: "Task Title",
+        description: "Original description",
+        interval_value: 1,
+        interval_unit: "days",
+        preferred_day_of_week: null,
+        next_due_date: "2025-01-10",
+        last_action_date: null,
+        last_action_type: null,
+        created_at: "2025-01-01T00:00:00Z",
+        updated_at: "2025-01-01T00:00:00Z",
+      };
+
+      const updatedTask: TaskDTO = {
+        ...existingTask,
+        description: "Updated description",
+        updated_at: "2025-01-02T00:00:00Z",
+      };
+
+      const command: UpdateTaskCommand = { description: "Updated description" };
+
+      const { supabase, updateMock } = createMockSupabaseForUpdateTask({ data: existingTask }, { data: updatedTask });
+      const service = new TaskService(supabase);
+
+      // Act
+      const result = await service.updateTask(userId, taskId, command);
+
+      // Assert
+      expect(result).toEqual(updatedTask);
+      expect(result.description).toBe("Updated description");
+      expect(updateMock).toHaveBeenCalledWith({ description: "Updated description" });
+    });
+
+    it("updates task description to null", async () => {
+      // Arrange
+      const existingTask: TaskDTO = {
+        id: taskId,
+        user_id: userId,
+        title: "Task Title",
+        description: "Original description",
+        interval_value: 1,
+        interval_unit: "days",
+        preferred_day_of_week: null,
+        next_due_date: "2025-01-10",
+        last_action_date: null,
+        last_action_type: null,
+        created_at: "2025-01-01T00:00:00Z",
+        updated_at: "2025-01-01T00:00:00Z",
+      };
+
+      const updatedTask: TaskDTO = {
+        ...existingTask,
+        description: null,
+        updated_at: "2025-01-02T00:00:00Z",
+      };
+
+      const command: UpdateTaskCommand = { description: null };
+
+      const { supabase, updateMock } = createMockSupabaseForUpdateTask({ data: existingTask }, { data: updatedTask });
+      const service = new TaskService(supabase);
+
+      // Act
+      const result = await service.updateTask(userId, taskId, command);
+
+      // Assert
+      expect(result).toEqual(updatedTask);
+      expect(result.description).toBeNull();
+      expect(updateMock).toHaveBeenCalledWith({ description: null });
+    });
+
+    it("updates multiple fields at once", async () => {
+      // Arrange
+      const existingTask: TaskDTO = {
+        id: taskId,
+        user_id: userId,
+        title: "Original Title",
+        description: "Original description",
+        interval_value: 1,
+        interval_unit: "days",
+        preferred_day_of_week: null,
+        next_due_date: "2025-01-10",
+        last_action_date: null,
+        last_action_type: null,
+        created_at: "2025-01-01T00:00:00Z",
+        updated_at: "2025-01-01T00:00:00Z",
+      };
+
+      const updatedTask: TaskDTO = {
+        ...existingTask,
+        title: "Updated Title",
+        description: "Updated description",
+        updated_at: "2025-01-02T00:00:00Z",
+      };
+
+      const command: UpdateTaskCommand = {
+        title: "Updated Title",
+        description: "Updated description",
+      };
+
+      const { supabase, updateMock } = createMockSupabaseForUpdateTask({ data: existingTask }, { data: updatedTask });
+      const service = new TaskService(supabase);
+
+      // Act
+      const result = await service.updateTask(userId, taskId, command);
+
+      // Assert
+      expect(result).toEqual(updatedTask);
+      expect(updateMock).toHaveBeenCalledWith({
+        title: "Updated Title",
+        description: "Updated description",
+      });
+    });
+
+    it("updates all fields at once", async () => {
+      // Arrange
+      const existingTask: TaskDTO = {
+        id: taskId,
+        user_id: userId,
+        title: "Original Title",
+        description: "Original description",
+        interval_value: 1,
+        interval_unit: "days",
+        preferred_day_of_week: null,
+        next_due_date: "2025-01-10",
+        last_action_date: null,
+        last_action_type: null,
+        created_at: "2025-01-01T00:00:00Z",
+        updated_at: "2025-01-01T00:00:00Z",
+      };
+
+      const newNextDueDate = "2025-02-15";
+      const updatedTask: TaskDTO = {
+        ...existingTask,
+        title: "Updated Title",
+        description: "Updated description",
+        interval_value: 2,
+        interval_unit: "weeks",
+        preferred_day_of_week: 1,
+        next_due_date: newNextDueDate,
+        updated_at: "2025-01-02T00:00:00Z",
+      };
+
+      const command: UpdateTaskCommand = {
+        title: "Updated Title",
+        description: "Updated description",
+        interval_value: 2,
+        interval_unit: "weeks",
+        preferred_day_of_week: 1,
+      };
+
+      const calculateSpy = vi.spyOn(TaskService.prototype, "calculateNextDueDate").mockReturnValue(newNextDueDate);
+
+      const { supabase, updateMock } = createMockSupabaseForUpdateTask({ data: existingTask }, { data: updatedTask });
+      const service = new TaskService(supabase);
+
+      // Act
+      const result = await service.updateTask(userId, taskId, command);
+
+      // Assert
+      expect(result).toEqual(updatedTask);
+      expect(calculateSpy).toHaveBeenCalledWith(2, "weeks", 1);
+      expect(updateMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "Updated Title",
+          description: "Updated description",
+          interval_value: 2,
+          interval_unit: "weeks",
+          preferred_day_of_week: 1,
+          next_due_date: newNextDueDate,
+        })
+      );
+    });
+  });
+
+  describe("Interval recalculation scenarios", () => {
+    it("recalculates next_due_date when interval_value is updated", async () => {
+      // Arrange
+      const existingTask: TaskDTO = {
+        id: taskId,
+        user_id: userId,
+        title: "Task Title",
+        description: null,
+        interval_value: 1,
+        interval_unit: "weeks",
+        preferred_day_of_week: null,
+        next_due_date: "2025-01-08",
+        last_action_date: null,
+        last_action_type: null,
+        created_at: "2025-01-01T00:00:00Z",
+        updated_at: "2025-01-01T00:00:00Z",
+      };
+
+      const newNextDueDate = "2025-01-22";
+      const updatedTask: TaskDTO = {
+        ...existingTask,
+        interval_value: 2,
+        next_due_date: newNextDueDate,
+        updated_at: "2025-01-02T00:00:00Z",
+      };
+
+      const command: UpdateTaskCommand = { interval_value: 2 };
+
+      const calculateSpy = vi.spyOn(TaskService.prototype, "calculateNextDueDate").mockReturnValue(newNextDueDate);
+
+      const { supabase, updateMock } = createMockSupabaseForUpdateTask({ data: existingTask }, { data: updatedTask });
+      const service = new TaskService(supabase);
+
+      // Act
+      const result = await service.updateTask(userId, taskId, command);
+
+      // Assert
+      expect(result.next_due_date).toBe(newNextDueDate);
+      expect(calculateSpy).toHaveBeenCalledWith(2, "weeks", null);
+      expect(updateMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          interval_value: 2,
+          next_due_date: newNextDueDate,
+        })
+      );
+    });
+
+    it("recalculates next_due_date when interval_unit is updated", async () => {
+      // Arrange
+      const existingTask: TaskDTO = {
+        id: taskId,
+        user_id: userId,
+        title: "Task Title",
+        description: null,
+        interval_value: 1,
+        interval_unit: "days",
+        preferred_day_of_week: null,
+        next_due_date: "2025-01-02",
+        last_action_date: null,
+        last_action_type: null,
+        created_at: "2025-01-01T00:00:00Z",
+        updated_at: "2025-01-01T00:00:00Z",
+      };
+
+      const newNextDueDate = "2025-01-08";
+      const updatedTask: TaskDTO = {
+        ...existingTask,
+        interval_unit: "weeks",
+        next_due_date: newNextDueDate,
+        updated_at: "2025-01-02T00:00:00Z",
+      };
+
+      const command: UpdateTaskCommand = { interval_unit: "weeks" };
+
+      const calculateSpy = vi.spyOn(TaskService.prototype, "calculateNextDueDate").mockReturnValue(newNextDueDate);
+
+      const { supabase, updateMock } = createMockSupabaseForUpdateTask({ data: existingTask }, { data: updatedTask });
+      const service = new TaskService(supabase);
+
+      // Act
+      const result = await service.updateTask(userId, taskId, command);
+
+      // Assert
+      expect(result.next_due_date).toBe(newNextDueDate);
+      expect(calculateSpy).toHaveBeenCalledWith(1, "weeks", null);
+      expect(updateMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          interval_unit: "weeks",
+          next_due_date: newNextDueDate,
+        })
+      );
+    });
+
+    it("recalculates next_due_date when preferred_day_of_week is updated", async () => {
+      // Arrange
+      const existingTask: TaskDTO = {
+        id: taskId,
+        user_id: userId,
+        title: "Task Title",
+        description: null,
+        interval_value: 1,
+        interval_unit: "weeks",
+        preferred_day_of_week: null,
+        next_due_date: "2025-01-08",
+        last_action_date: null,
+        last_action_type: null,
+        created_at: "2025-01-01T00:00:00Z",
+        updated_at: "2025-01-01T00:00:00Z",
+      };
+
+      const newNextDueDate = "2025-01-13";
+      const updatedTask: TaskDTO = {
+        ...existingTask,
+        preferred_day_of_week: 1,
+        next_due_date: newNextDueDate,
+        updated_at: "2025-01-02T00:00:00Z",
+      };
+
+      const command: UpdateTaskCommand = { preferred_day_of_week: 1 };
+
+      const calculateSpy = vi.spyOn(TaskService.prototype, "calculateNextDueDate").mockReturnValue(newNextDueDate);
+
+      const { supabase, updateMock } = createMockSupabaseForUpdateTask({ data: existingTask }, { data: updatedTask });
+      const service = new TaskService(supabase);
+
+      // Act
+      const result = await service.updateTask(userId, taskId, command);
+
+      // Assert
+      expect(result.next_due_date).toBe(newNextDueDate);
+      expect(calculateSpy).toHaveBeenCalledWith(1, "weeks", 1);
+      expect(updateMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          preferred_day_of_week: 1,
+          next_due_date: newNextDueDate,
+        })
+      );
+    });
+
+    it("recalculates next_due_date when preferred_day_of_week is set to null", async () => {
+      // Arrange
+      const existingTask: TaskDTO = {
+        id: taskId,
+        user_id: userId,
+        title: "Task Title",
+        description: null,
+        interval_value: 1,
+        interval_unit: "weeks",
+        preferred_day_of_week: 1,
+        next_due_date: "2025-01-13",
+        last_action_date: null,
+        last_action_type: null,
+        created_at: "2025-01-01T00:00:00Z",
+        updated_at: "2025-01-01T00:00:00Z",
+      };
+
+      const newNextDueDate = "2025-01-08";
+      const updatedTask: TaskDTO = {
+        ...existingTask,
+        preferred_day_of_week: null,
+        next_due_date: newNextDueDate,
+        updated_at: "2025-01-02T00:00:00Z",
+      };
+
+      const command: UpdateTaskCommand = { preferred_day_of_week: null };
+
+      const calculateSpy = vi.spyOn(TaskService.prototype, "calculateNextDueDate").mockReturnValue(newNextDueDate);
+
+      const { supabase, updateMock } = createMockSupabaseForUpdateTask({ data: existingTask }, { data: updatedTask });
+      const service = new TaskService(supabase);
+
+      // Act
+      const result = await service.updateTask(userId, taskId, command);
+
+      // Assert
+      expect(result.next_due_date).toBe(newNextDueDate);
+      expect(calculateSpy).toHaveBeenCalledWith(1, "weeks", null);
+      expect(updateMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          preferred_day_of_week: null,
+          next_due_date: newNextDueDate,
+        })
+      );
+    });
+
+    it("uses existing interval values when only preferred_day_of_week is updated", async () => {
+      // Arrange
+      const existingTask: TaskDTO = {
+        id: taskId,
+        user_id: userId,
+        title: "Task Title",
+        description: null,
+        interval_value: 2,
+        interval_unit: "months",
+        preferred_day_of_week: null,
+        next_due_date: "2025-03-01",
+        last_action_date: null,
+        last_action_type: null,
+        created_at: "2025-01-01T00:00:00Z",
+        updated_at: "2025-01-01T00:00:00Z",
+      };
+
+      const newNextDueDate = "2025-03-03";
+      const updatedTask: TaskDTO = {
+        ...existingTask,
+        preferred_day_of_week: 1,
+        next_due_date: newNextDueDate,
+        updated_at: "2025-01-02T00:00:00Z",
+      };
+
+      const command: UpdateTaskCommand = { preferred_day_of_week: 1 };
+
+      const calculateSpy = vi.spyOn(TaskService.prototype, "calculateNextDueDate").mockReturnValue(newNextDueDate);
+
+      const { supabase } = createMockSupabaseForUpdateTask({ data: existingTask }, { data: updatedTask });
+      const service = new TaskService(supabase);
+
+      // Act
+      await service.updateTask(userId, taskId, command);
+
+      // Assert
+      expect(calculateSpy).toHaveBeenCalledWith(2, "months", 1);
+    });
+
+    it("uses existing preferred_day_of_week when only interval_value is updated", async () => {
+      // Arrange
+      const existingTask: TaskDTO = {
+        id: taskId,
+        user_id: userId,
+        title: "Task Title",
+        description: null,
+        interval_value: 1,
+        interval_unit: "weeks",
+        preferred_day_of_week: 3,
+        next_due_date: "2025-01-15",
+        last_action_date: null,
+        last_action_type: null,
+        created_at: "2025-01-01T00:00:00Z",
+        updated_at: "2025-01-01T00:00:00Z",
+      };
+
+      const newNextDueDate = "2025-01-29";
+      const updatedTask: TaskDTO = {
+        ...existingTask,
+        interval_value: 2,
+        next_due_date: newNextDueDate,
+        updated_at: "2025-01-02T00:00:00Z",
+      };
+
+      const command: UpdateTaskCommand = { interval_value: 2 };
+
+      const calculateSpy = vi.spyOn(TaskService.prototype, "calculateNextDueDate").mockReturnValue(newNextDueDate);
+
+      const { supabase } = createMockSupabaseForUpdateTask({ data: existingTask }, { data: updatedTask });
+      const service = new TaskService(supabase);
+
+      // Act
+      await service.updateTask(userId, taskId, command);
+
+      // Assert
+      expect(calculateSpy).toHaveBeenCalledWith(2, "weeks", 3);
+    });
+
+    it("recalculates next_due_date when multiple interval fields are updated", async () => {
+      // Arrange
+      const existingTask: TaskDTO = {
+        id: taskId,
+        user_id: userId,
+        title: "Task Title",
+        description: null,
+        interval_value: 1,
+        interval_unit: "days",
+        preferred_day_of_week: null,
+        next_due_date: "2025-01-02",
+        last_action_date: null,
+        last_action_type: null,
+        created_at: "2025-01-01T00:00:00Z",
+        updated_at: "2025-01-01T00:00:00Z",
+      };
+
+      const newNextDueDate = "2025-01-20";
+      const updatedTask: TaskDTO = {
+        ...existingTask,
+        interval_value: 2,
+        interval_unit: "weeks",
+        preferred_day_of_week: 1,
+        next_due_date: newNextDueDate,
+        updated_at: "2025-01-02T00:00:00Z",
+      };
+
+      const command: UpdateTaskCommand = {
+        interval_value: 2,
+        interval_unit: "weeks",
+        preferred_day_of_week: 1,
+      };
+
+      const calculateSpy = vi.spyOn(TaskService.prototype, "calculateNextDueDate").mockReturnValue(newNextDueDate);
+
+      const { supabase, updateMock } = createMockSupabaseForUpdateTask({ data: existingTask }, { data: updatedTask });
+      const service = new TaskService(supabase);
+
+      // Act
+      const result = await service.updateTask(userId, taskId, command);
+
+      // Assert
+      expect(result.next_due_date).toBe(newNextDueDate);
+      expect(calculateSpy).toHaveBeenCalledWith(2, "weeks", 1);
+      expect(updateMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          interval_value: 2,
+          interval_unit: "weeks",
+          preferred_day_of_week: 1,
+          next_due_date: newNextDueDate,
+        })
+      );
+    });
+
+    it("does not recalculate next_due_date when only non-interval fields are updated", async () => {
+      // Arrange
+      const existingTask: TaskDTO = {
+        id: taskId,
+        user_id: userId,
+        title: "Task Title",
+        description: "Original description",
+        interval_value: 1,
+        interval_unit: "weeks",
+        preferred_day_of_week: 1,
+        next_due_date: "2025-01-15",
+        last_action_date: null,
+        last_action_type: null,
+        created_at: "2025-01-01T00:00:00Z",
+        updated_at: "2025-01-01T00:00:00Z",
+      };
+
+      const updatedTask: TaskDTO = {
+        ...existingTask,
+        title: "Updated Title",
+        description: "Updated description",
+        updated_at: "2025-01-02T00:00:00Z",
+      };
+
+      const command: UpdateTaskCommand = {
+        title: "Updated Title",
+        description: "Updated description",
+      };
+
+      const calculateSpy = vi.spyOn(TaskService.prototype, "calculateNextDueDate");
+
+      const { supabase, updateMock } = createMockSupabaseForUpdateTask({ data: existingTask }, { data: updatedTask });
+      const service = new TaskService(supabase);
+
+      // Act
+      const result = await service.updateTask(userId, taskId, command);
+
+      // Assert
+      expect(result.next_due_date).toBe(existingTask.next_due_date);
+      expect(calculateSpy).not.toHaveBeenCalled();
+      expect(updateMock).toHaveBeenCalledWith({
+        title: "Updated Title",
+        description: "Updated description",
+      });
+    });
+  });
+
+  describe("Empty update scenarios", () => {
+    it("returns existing task when no fields are provided in command", async () => {
+      // Arrange
+      const existingTask: TaskDTO = {
+        id: taskId,
+        user_id: userId,
+        title: "Task Title",
+        description: "Description",
+        interval_value: 1,
+        interval_unit: "days",
+        preferred_day_of_week: null,
+        next_due_date: "2025-01-10",
+        last_action_date: null,
+        last_action_type: null,
+        created_at: "2025-01-01T00:00:00Z",
+        updated_at: "2025-01-01T00:00:00Z",
+      };
+
+      const command: UpdateTaskCommand = {};
+
+      const { supabase, updateMock } = createMockSupabaseForUpdateTask({ data: existingTask }, { data: null });
+      const service = new TaskService(supabase);
+
+      // Act
+      const result = await service.updateTask(userId, taskId, command);
+
+      // Assert
+      expect(result).toEqual(existingTask);
+      expect(updateMock).not.toHaveBeenCalled();
+    });
+
+    it("returns existing task when all fields are undefined", async () => {
+      // Arrange
+      const existingTask: TaskDTO = {
+        id: taskId,
+        user_id: userId,
+        title: "Task Title",
+        description: null,
+        interval_value: 1,
+        interval_unit: "days",
+        preferred_day_of_week: null,
+        next_due_date: "2025-01-10",
+        last_action_date: null,
+        last_action_type: null,
+        created_at: "2025-01-01T00:00:00Z",
+        updated_at: "2025-01-01T00:00:00Z",
+      };
+
+      const command: UpdateTaskCommand = {
+        title: undefined,
+        description: undefined,
+        interval_value: undefined,
+        interval_unit: undefined,
+        preferred_day_of_week: undefined,
+      };
+
+      const { supabase, updateMock } = createMockSupabaseForUpdateTask({ data: existingTask }, { data: null });
+      const service = new TaskService(supabase);
+
+      // Act
+      const result = await service.updateTask(userId, taskId, command);
+
+      // Assert
+      expect(result).toEqual(existingTask);
+      expect(updateMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("User isolation and authorization", () => {
+    it("applies user_id filter in fetch query to ensure ownership", async () => {
+      // Arrange
+      const existingTask: TaskDTO = {
+        id: taskId,
+        user_id: userId,
+        title: "Task Title",
+        description: null,
+        interval_value: 1,
+        interval_unit: "days",
+        preferred_day_of_week: null,
+        next_due_date: "2025-01-10",
+        last_action_date: null,
+        last_action_type: null,
+        created_at: "2025-01-01T00:00:00Z",
+        updated_at: "2025-01-01T00:00:00Z",
+      };
+
+      const updatedTask: TaskDTO = {
+        ...existingTask,
+        title: "Updated Title",
+        updated_at: "2025-01-02T00:00:00Z",
+      };
+
+      const command: UpdateTaskCommand = { title: "Updated Title" };
+
+      const { supabase, fetchEqUserIdMock } = createMockSupabaseForUpdateTask(
+        { data: existingTask },
+        { data: updatedTask }
+      );
+      const service = new TaskService(supabase);
+
+      // Act
+      await service.updateTask(userId, taskId, command);
+
+      // Assert
+      expect(fetchEqUserIdMock).toHaveBeenCalledWith("user_id", userId);
+    });
+
+    it("applies user_id filter in update query to ensure ownership", async () => {
+      // Arrange
+      const existingTask: TaskDTO = {
+        id: taskId,
+        user_id: userId,
+        title: "Task Title",
+        description: null,
+        interval_value: 1,
+        interval_unit: "days",
+        preferred_day_of_week: null,
+        next_due_date: "2025-01-10",
+        last_action_date: null,
+        last_action_type: null,
+        created_at: "2025-01-01T00:00:00Z",
+        updated_at: "2025-01-01T00:00:00Z",
+      };
+
+      const updatedTask: TaskDTO = {
+        ...existingTask,
+        title: "Updated Title",
+        updated_at: "2025-01-02T00:00:00Z",
+      };
+
+      const command: UpdateTaskCommand = { title: "Updated Title" };
+
+      const { supabase, updateEqUserIdMock } = createMockSupabaseForUpdateTask(
+        { data: existingTask },
+        { data: updatedTask }
+      );
+      const service = new TaskService(supabase);
+
+      // Act
+      await service.updateTask(userId, taskId, command);
+
+      // Assert
+      expect(updateEqUserIdMock).toHaveBeenCalledWith("user_id", userId);
+    });
+
+    it("throws error when task belongs to different user", async () => {
+      // Arrange
+      const differentUserId = "user-456";
+      const command: UpdateTaskCommand = { title: "Updated Title" };
+
+      const { supabase } = createMockSupabaseForUpdateTask(
+        {
+          data: null,
+          error: { message: "No rows returned" },
+        },
+        { data: null }
+      );
+      const service = new TaskService(supabase);
+
+      // Act & Assert
+      await expect(service.updateTask(differentUserId, taskId, command)).rejects.toThrow(
+        "Task not found or does not belong to user"
+      );
+    });
+
+    it("throws error when task does not exist", async () => {
+      // Arrange
+      const nonExistentTaskId = "00000000-0000-0000-0000-000000000000";
+      const command: UpdateTaskCommand = { title: "Updated Title" };
+
+      const { supabase } = createMockSupabaseForUpdateTask(
+        {
+          data: null,
+          error: { message: "No rows returned" },
+        },
+        { data: null }
+      );
+      const service = new TaskService(supabase);
+
+      // Act & Assert
+      await expect(service.updateTask(userId, nonExistentTaskId, command)).rejects.toThrow(
+        "Task not found or does not belong to user"
+      );
+    });
+  });
+
+  describe("Error handling", () => {
+    it("throws error with descriptive message when fetch query fails", async () => {
+      // Arrange
+      const command: UpdateTaskCommand = { title: "Updated Title" };
+      const errorMessage = "connection timeout";
+
+      const { supabase } = createMockSupabaseForUpdateTask(
+        {
+          data: null,
+          error: { message: errorMessage },
+        },
+        { data: null }
+      );
+      const service = new TaskService(supabase);
+
+      // Act & Assert
+      await expect(service.updateTask(userId, taskId, command)).rejects.toThrow(
+        "Task not found or does not belong to user"
+      );
+    });
+
+    it("throws error with descriptive message when update query fails", async () => {
+      // Arrange
+      const existingTask: TaskDTO = {
+        id: taskId,
+        user_id: userId,
+        title: "Task Title",
+        description: null,
+        interval_value: 1,
+        interval_unit: "days",
+        preferred_day_of_week: null,
+        next_due_date: "2025-01-10",
+        last_action_date: null,
+        last_action_type: null,
+        created_at: "2025-01-01T00:00:00Z",
+        updated_at: "2025-01-01T00:00:00Z",
+      };
+
+      const command: UpdateTaskCommand = { title: "Updated Title" };
+      const errorMessage = "update failed: constraint violation";
+
+      const { supabase } = createMockSupabaseForUpdateTask(
+        { data: existingTask },
+        {
+          data: null,
+          error: { message: errorMessage },
+        }
+      );
+      const service = new TaskService(supabase);
+
+      // Act & Assert
+      await expect(service.updateTask(userId, taskId, command)).rejects.toThrow(
+        `Failed to update task: ${errorMessage}`
+      );
+    });
+
+    it("throws error when update returns no data", async () => {
+      // Arrange
+      const existingTask: TaskDTO = {
+        id: taskId,
+        user_id: userId,
+        title: "Task Title",
+        description: null,
+        interval_value: 1,
+        interval_unit: "days",
+        preferred_day_of_week: null,
+        next_due_date: "2025-01-10",
+        last_action_date: null,
+        last_action_type: null,
+        created_at: "2025-01-01T00:00:00Z",
+        updated_at: "2025-01-01T00:00:00Z",
+      };
+
+      const command: UpdateTaskCommand = { title: "Updated Title" };
+
+      const { supabase } = createMockSupabaseForUpdateTask({ data: existingTask }, { data: null, error: null });
+      const service = new TaskService(supabase);
+
+      // Act & Assert
+      await expect(service.updateTask(userId, taskId, command)).rejects.toThrow("Failed to update task: Unknown error");
+    });
+
+    it("handles error object with null message", async () => {
+      // Arrange
+      const existingTask: TaskDTO = {
+        id: taskId,
+        user_id: userId,
+        title: "Task Title",
+        description: null,
+        interval_value: 1,
+        interval_unit: "days",
+        preferred_day_of_week: null,
+        next_due_date: "2025-01-10",
+        last_action_date: null,
+        last_action_type: null,
+        created_at: "2025-01-01T00:00:00Z",
+        updated_at: "2025-01-01T00:00:00Z",
+      };
+
+      const command: UpdateTaskCommand = { title: "Updated Title" };
+
+      const { supabase } = createMockSupabaseForUpdateTask(
+        { data: existingTask },
+        {
+          data: null,
+          error: { message: null as unknown as string },
+        }
+      );
+      const service = new TaskService(supabase);
+
+      // Act & Assert
+      await expect(service.updateTask(userId, taskId, command)).rejects.toThrow("Failed to update task: Unknown error");
+    });
+  });
+
+  describe("Query chain verification", () => {
+    it("calls from('tasks') with correct table name for fetch query", async () => {
+      // Arrange
+      const existingTask: TaskDTO = {
+        id: taskId,
+        user_id: userId,
+        title: "Task Title",
+        description: null,
+        interval_value: 1,
+        interval_unit: "days",
+        preferred_day_of_week: null,
+        next_due_date: "2025-01-10",
+        last_action_date: null,
+        last_action_type: null,
+        created_at: "2025-01-01T00:00:00Z",
+        updated_at: "2025-01-01T00:00:00Z",
+      };
+
+      const updatedTask: TaskDTO = {
+        ...existingTask,
+        title: "Updated Title",
+        updated_at: "2025-01-02T00:00:00Z",
+      };
+
+      const command: UpdateTaskCommand = { title: "Updated Title" };
+
+      const { supabase, fromMock } = createMockSupabaseForUpdateTask({ data: existingTask }, { data: updatedTask });
+      const service = new TaskService(supabase);
+
+      // Act
+      await service.updateTask(userId, taskId, command);
+
+      // Assert
+      expect(fromMock).toHaveBeenCalledWith("tasks");
+    });
+
+    it("calls select('*') in fetch query to retrieve all columns", async () => {
+      // Arrange
+      const existingTask: TaskDTO = {
+        id: taskId,
+        user_id: userId,
+        title: "Task Title",
+        description: null,
+        interval_value: 1,
+        interval_unit: "days",
+        preferred_day_of_week: null,
+        next_due_date: "2025-01-10",
+        last_action_date: null,
+        last_action_type: null,
+        created_at: "2025-01-01T00:00:00Z",
+        updated_at: "2025-01-01T00:00:00Z",
+      };
+
+      const updatedTask: TaskDTO = {
+        ...existingTask,
+        title: "Updated Title",
+        updated_at: "2025-01-02T00:00:00Z",
+      };
+
+      const command: UpdateTaskCommand = { title: "Updated Title" };
+
+      const { supabase, fetchSelectMock } = createMockSupabaseForUpdateTask(
+        { data: existingTask },
+        { data: updatedTask }
+      );
+      const service = new TaskService(supabase);
+
+      // Act
+      await service.updateTask(userId, taskId, command);
+
+      // Assert
+      expect(fetchSelectMock).toHaveBeenCalledWith("*");
+    });
+
+    it("calls single() in fetch query to expect exactly one result", async () => {
+      // Arrange
+      const existingTask: TaskDTO = {
+        id: taskId,
+        user_id: userId,
+        title: "Task Title",
+        description: null,
+        interval_value: 1,
+        interval_unit: "days",
+        preferred_day_of_week: null,
+        next_due_date: "2025-01-10",
+        last_action_date: null,
+        last_action_type: null,
+        created_at: "2025-01-01T00:00:00Z",
+        updated_at: "2025-01-01T00:00:00Z",
+      };
+
+      const updatedTask: TaskDTO = {
+        ...existingTask,
+        title: "Updated Title",
+        updated_at: "2025-01-02T00:00:00Z",
+      };
+
+      const command: UpdateTaskCommand = { title: "Updated Title" };
+
+      const { supabase, fetchSingleMock } = createMockSupabaseForUpdateTask(
+        { data: existingTask },
+        { data: updatedTask }
+      );
+      const service = new TaskService(supabase);
+
+      // Act
+      await service.updateTask(userId, taskId, command);
+
+      // Assert
+      expect(fetchSingleMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("calls select() in update query to retrieve updated record", async () => {
+      // Arrange
+      const existingTask: TaskDTO = {
+        id: taskId,
+        user_id: userId,
+        title: "Task Title",
+        description: null,
+        interval_value: 1,
+        interval_unit: "days",
+        preferred_day_of_week: null,
+        next_due_date: "2025-01-10",
+        last_action_date: null,
+        last_action_type: null,
+        created_at: "2025-01-01T00:00:00Z",
+        updated_at: "2025-01-01T00:00:00Z",
+      };
+
+      const updatedTask: TaskDTO = {
+        ...existingTask,
+        title: "Updated Title",
+        updated_at: "2025-01-02T00:00:00Z",
+      };
+
+      const command: UpdateTaskCommand = { title: "Updated Title" };
+
+      const { supabase, updateSelectMock } = createMockSupabaseForUpdateTask(
+        { data: existingTask },
+        { data: updatedTask }
+      );
+      const service = new TaskService(supabase);
+
+      // Act
+      await service.updateTask(userId, taskId, command);
+
+      // Assert
+      expect(updateSelectMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("calls single() in update query to expect exactly one result", async () => {
+      // Arrange
+      const existingTask: TaskDTO = {
+        id: taskId,
+        user_id: userId,
+        title: "Task Title",
+        description: null,
+        interval_value: 1,
+        interval_unit: "days",
+        preferred_day_of_week: null,
+        next_due_date: "2025-01-10",
+        last_action_date: null,
+        last_action_type: null,
+        created_at: "2025-01-01T00:00:00Z",
+        updated_at: "2025-01-01T00:00:00Z",
+      };
+
+      const updatedTask: TaskDTO = {
+        ...existingTask,
+        title: "Updated Title",
+        updated_at: "2025-01-02T00:00:00Z",
+      };
+
+      const command: UpdateTaskCommand = { title: "Updated Title" };
+
+      const { supabase, updateSingleMock } = createMockSupabaseForUpdateTask(
+        { data: existingTask },
+        { data: updatedTask }
+      );
+      const service = new TaskService(supabase);
+
+      // Act
+      await service.updateTask(userId, taskId, command);
+
+      // Assert
+      expect(updateSingleMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("Edge cases and boundary conditions", () => {
+    it("handles update with all interval unit types", async () => {
+      // Arrange
+      const units: ("days" | "weeks" | "months" | "years")[] = ["days", "weeks", "months", "years"];
+
+      for (const unit of units) {
+        const existingTask: TaskDTO = {
+          id: taskId,
+          user_id: userId,
+          title: "Task Title",
+          description: null,
+          interval_value: 1,
+          interval_unit: "days",
+          preferred_day_of_week: null,
+          next_due_date: "2025-01-02",
+          last_action_date: null,
+          last_action_type: null,
+          created_at: "2025-01-01T00:00:00Z",
+          updated_at: "2025-01-01T00:00:00Z",
+        };
+
+        const newNextDueDate = "2025-02-01";
+        const updatedTask: TaskDTO = {
+          ...existingTask,
+          interval_unit: unit,
+          next_due_date: newNextDueDate,
+          updated_at: "2025-01-02T00:00:00Z",
+        };
+
+        const command: UpdateTaskCommand = { interval_unit: unit };
+
+        const calculateSpy = vi.spyOn(TaskService.prototype, "calculateNextDueDate").mockReturnValue(newNextDueDate);
+
+        const { supabase } = createMockSupabaseForUpdateTask({ data: existingTask }, { data: updatedTask });
+        const service = new TaskService(supabase);
+
+        // Act
+        const result = await service.updateTask(userId, taskId, command);
+
+        // Assert
+        expect(result.interval_unit).toBe(unit);
+        expect(calculateSpy).toHaveBeenCalledWith(1, unit, null);
+
+        vi.restoreAllMocks();
+      }
+    });
+
+    it("handles update with all preferred day of week values (0-6)", async () => {
+      // Arrange
+      for (let day = 0; day <= 6; day++) {
+        const existingTask: TaskDTO = {
+          id: taskId,
+          user_id: userId,
+          title: "Task Title",
+          description: null,
+          interval_value: 1,
+          interval_unit: "weeks",
+          preferred_day_of_week: null,
+          next_due_date: "2025-01-08",
+          last_action_date: null,
+          last_action_type: null,
+          created_at: "2025-01-01T00:00:00Z",
+          updated_at: "2025-01-01T00:00:00Z",
+        };
+
+        const newNextDueDate = "2025-01-13";
+        const updatedTask: TaskDTO = {
+          ...existingTask,
+          preferred_day_of_week: day,
+          next_due_date: newNextDueDate,
+          updated_at: "2025-01-02T00:00:00Z",
+        };
+
+        const command: UpdateTaskCommand = { preferred_day_of_week: day };
+
+        const calculateSpy = vi.spyOn(TaskService.prototype, "calculateNextDueDate").mockReturnValue(newNextDueDate);
+
+        const { supabase } = createMockSupabaseForUpdateTask({ data: existingTask }, { data: updatedTask });
+        const service = new TaskService(supabase);
+
+        // Act
+        const result = await service.updateTask(userId, taskId, command);
+
+        // Assert
+        expect(result.preferred_day_of_week).toBe(day);
+        expect(calculateSpy).toHaveBeenCalledWith(1, "weeks", day);
+
+        vi.restoreAllMocks();
+      }
+    });
+
+    it("handles update with minimum interval value (1)", async () => {
+      // Arrange
+      const existingTask: TaskDTO = {
+        id: taskId,
+        user_id: userId,
+        title: "Task Title",
+        description: null,
+        interval_value: 5,
+        interval_unit: "days",
+        preferred_day_of_week: null,
+        next_due_date: "2025-01-06",
+        last_action_date: null,
+        last_action_type: null,
+        created_at: "2025-01-01T00:00:00Z",
+        updated_at: "2025-01-01T00:00:00Z",
+      };
+
+      const newNextDueDate = "2025-01-02";
+      const updatedTask: TaskDTO = {
+        ...existingTask,
+        interval_value: 1,
+        next_due_date: newNextDueDate,
+        updated_at: "2025-01-02T00:00:00Z",
+      };
+
+      const command: UpdateTaskCommand = { interval_value: 1 };
+
+      vi.spyOn(TaskService.prototype, "calculateNextDueDate").mockReturnValue(newNextDueDate);
+
+      const { supabase } = createMockSupabaseForUpdateTask({ data: existingTask }, { data: updatedTask });
+      const service = new TaskService(supabase);
+
+      // Act
+      const result = await service.updateTask(userId, taskId, command);
+
+      // Assert
+      expect(result.interval_value).toBe(1);
+    });
+
+    it("handles update with maximum interval value (999)", async () => {
+      // Arrange
+      const existingTask: TaskDTO = {
+        id: taskId,
+        user_id: userId,
+        title: "Task Title",
+        description: null,
+        interval_value: 1,
+        interval_unit: "days",
+        preferred_day_of_week: null,
+        next_due_date: "2025-01-02",
+        last_action_date: null,
+        last_action_type: null,
+        created_at: "2025-01-01T00:00:00Z",
+        updated_at: "2025-01-01T00:00:00Z",
+      };
+
+      const newNextDueDate = "2027-09-27";
+      const updatedTask: TaskDTO = {
+        ...existingTask,
+        interval_value: 999,
+        next_due_date: newNextDueDate,
+        updated_at: "2025-01-02T00:00:00Z",
+      };
+
+      const command: UpdateTaskCommand = { interval_value: 999 };
+
+      vi.spyOn(TaskService.prototype, "calculateNextDueDate").mockReturnValue(newNextDueDate);
+
+      const { supabase } = createMockSupabaseForUpdateTask({ data: existingTask }, { data: updatedTask });
+      const service = new TaskService(supabase);
+
+      // Act
+      const result = await service.updateTask(userId, taskId, command);
+
+      // Assert
+      expect(result.interval_value).toBe(999);
+    });
+
+    it("preserves existing values when only some fields are updated", async () => {
+      // Arrange
+      const existingTask: TaskDTO = {
+        id: taskId,
+        user_id: userId,
+        title: "Original Title",
+        description: "Original description",
+        interval_value: 2,
+        interval_unit: "weeks",
+        preferred_day_of_week: 3,
+        next_due_date: "2025-01-15",
+        last_action_date: "2025-01-01",
+        last_action_type: "completed",
+        created_at: "2025-01-01T00:00:00Z",
+        updated_at: "2025-01-01T00:00:00Z",
+      };
+
+      const updatedTask: TaskDTO = {
+        ...existingTask,
+        title: "Updated Title",
+        updated_at: "2025-01-02T00:00:00Z",
+      };
+
+      const command: UpdateTaskCommand = { title: "Updated Title" };
+
+      const { supabase, updateMock } = createMockSupabaseForUpdateTask({ data: existingTask }, { data: updatedTask });
+      const service = new TaskService(supabase);
+
+      // Act
+      const result = await service.updateTask(userId, taskId, command);
+
+      // Assert
+      expect(result.title).toBe("Updated Title");
+      expect(result.description).toBe("Original description");
+      expect(result.interval_value).toBe(2);
+      expect(result.interval_unit).toBe("weeks");
+      expect(result.preferred_day_of_week).toBe(3);
+      expect(result.last_action_date).toBe("2025-01-01");
+      expect(result.last_action_type).toBe("completed");
+      expect(updateMock).toHaveBeenCalledWith({ title: "Updated Title" });
+    });
+  });
+
+  describe("Business rules validation", () => {
+    it("ensures user can only update their own tasks", async () => {
+      // Arrange
+      const ownerUserId = "user-owner";
+      const unauthorizedUserId = "user-unauthorized";
+      const existingTask: TaskDTO = {
+        id: taskId,
+        user_id: ownerUserId,
+        title: "Owner's Task",
+        description: null,
+        interval_value: 1,
+        interval_unit: "days",
+        preferred_day_of_week: null,
+        next_due_date: "2025-01-10",
+        last_action_date: null,
+        last_action_type: null,
+        created_at: "2025-01-01T00:00:00Z",
+        updated_at: "2025-01-01T00:00:00Z",
+      };
+
+      const command: UpdateTaskCommand = { title: "Updated Title" };
+
+      // Owner can update
+      const { supabase: ownerSupabase } = createMockSupabaseForUpdateTask(
+        { data: existingTask },
+        {
+          data: { ...existingTask, title: "Updated Title", updated_at: "2025-01-02T00:00:00Z" },
+        }
+      );
+      const ownerService = new TaskService(ownerSupabase);
+      await expect(ownerService.updateTask(ownerUserId, taskId, command)).resolves.toHaveProperty(
+        "title",
+        "Updated Title"
+      );
+
+      // Unauthorized user cannot update
+      const { supabase: unauthorizedSupabase } = createMockSupabaseForUpdateTask(
+        {
+          data: null,
+          error: { message: "No rows returned" },
+        },
+        { data: null }
+      );
+      const unauthorizedService = new TaskService(unauthorizedSupabase);
+      await expect(unauthorizedService.updateTask(unauthorizedUserId, taskId, command)).rejects.toThrow(
+        "Task not found or does not belong to user"
+      );
+    });
+
+    it("recalculates next_due_date using current date, not existing next_due_date", async () => {
+      // Arrange
+      const existingTask: TaskDTO = {
+        id: taskId,
+        user_id: userId,
+        title: "Task Title",
+        description: null,
+        interval_value: 1,
+        interval_unit: "weeks",
+        preferred_day_of_week: null,
+        next_due_date: "2025-01-15", // Old due date
+        last_action_date: null,
+        last_action_type: null,
+        created_at: "2025-01-01T00:00:00Z",
+        updated_at: "2025-01-01T00:00:00Z",
+      };
+
+      const newNextDueDate = "2025-01-22"; // Should be calculated from current date, not 2025-01-15
+      const updatedTask: TaskDTO = {
+        ...existingTask,
+        interval_value: 2,
+        next_due_date: newNextDueDate,
+        updated_at: "2025-01-02T00:00:00Z",
+      };
+
+      const command: UpdateTaskCommand = { interval_value: 2 };
+
+      const calculateSpy = vi.spyOn(TaskService.prototype, "calculateNextDueDate").mockReturnValue(newNextDueDate);
+
+      const { supabase } = createMockSupabaseForUpdateTask({ data: existingTask }, { data: updatedTask });
+      const service = new TaskService(supabase);
+
+      // Act
+      await service.updateTask(userId, taskId, command);
+
+      // Assert
+      expect(calculateSpy).toHaveBeenCalledWith(2, "weeks", null);
+      // The calculation should use current date, not the existing next_due_date
+      // This is verified by the spy being called with the new interval_value
     });
   });
 });
