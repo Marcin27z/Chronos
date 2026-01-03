@@ -35,6 +35,32 @@ export const UserMenu = ({ profile, isOpen, onToggle, onNavigate, onLogout, clos
 
     if (option.action) {
       await option.action();
+    } else if (option.label === "Wyloguj") {
+      // Direct logout handling to avoid serialization issues
+      await handleLogout();
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      const response = await fetch("/api/auth/logout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        // eslint-disable-next-line no-console
+        console.error("Logout failed:", await response.text());
+        return;
+      }
+
+      // Redirect to login page after successful logout
+      window.location.assign("/login");
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error("Logout error:", error);
     }
   };
 

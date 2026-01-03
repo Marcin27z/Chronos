@@ -13,10 +13,9 @@ export interface NavbarProps {
   navItems: NavItemDTO[];
   breadcrumbs?: BreadcrumbEntry[];
   userProfile: UserProfileVM | null;
-  onLogout: () => Promise<void>;
 }
 
-export const Navbar = ({ navItems, breadcrumbs = [], userProfile, onLogout }: NavbarProps) => {
+export const Navbar = ({ navItems, breadcrumbs = [], userProfile }: NavbarProps) => {
   const {
     state: navbarState,
     setActivePath,
@@ -54,9 +53,9 @@ export const Navbar = ({ navItems, breadcrumbs = [], userProfile, onLogout }: Na
     () => [
       { label: "Profil", href: "/profile", type: "link" },
       { label: "Ustawienia", href: "/settings", type: "link" },
-      { label: "Wyloguj", action: onLogout, type: "action" },
+      { label: "Wyloguj", type: "action" },
     ],
-    [onLogout]
+    []
   );
 
   const handleUserOptionAction = useCallback(
@@ -92,7 +91,7 @@ export const Navbar = ({ navItems, breadcrumbs = [], userProfile, onLogout }: Na
             isOpen={navbarState.isUserMenuOpen}
             onToggle={toggleUserMenu}
             onNavigate={handleNavigate}
-            onLogout={onLogout}
+            onLogout={() => Promise.resolve()}
             closeMenus={closeMenus}
             options={userMenuOptions}
           />

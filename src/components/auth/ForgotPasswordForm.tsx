@@ -25,7 +25,7 @@ export function ForgotPasswordForm() {
   }, []);
 
   const handleSubmit = React.useCallback(
-    (event: React.FormEvent<HTMLFormElement>) => {
+    async (event: React.FormEvent<HTMLFormElement>) => {
       event.preventDefault();
       const result = forgotPasswordSchema.safeParse(form);
       if (!result.success) {
@@ -35,13 +35,33 @@ export function ForgotPasswordForm() {
 
       setIsLoading(true);
       setStatus({ type: "info", message: "Przygotowujemy link do resetu hasła..." });
-      timeoutRef.current = setTimeout(() => {
-        setIsLoading(false);
+
+      try {
+        const response = await fetch("/api/auth/forgot-password", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ email: form.email }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          setStatus({ type: "error", message: data.error || "Wystąpił błąd podczas wysyłania linku" });
+          return;
+        }
+
         setStatus({
           type: "success",
-          message: "Jeśli konto istnieje, wysłaliśmy link resetujący hasło na wskazany adres.",
+          message: data.message || "Jeśli konto istnieje, wysłaliśmy link resetujący hasło na wskazany adres.",
         });
-      }, 600);
+      } catch (error) {
+        console.error("Forgot password error:", error);
+        setStatus({ type: "error", message: "Problem z połączeniem. Sprawdź internet i spróbuj ponownie" });
+      } finally {
+        setIsLoading(false);
+      }
     },
     [form]
   );

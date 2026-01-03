@@ -8,27 +8,18 @@ interface Props {
   title?: string;
   breadcrumbs?: BreadcrumbEntry[];
   userProfile?: UserProfileVM | null;
-  onLogout?: () => Promise<void>;
 }
 
-const { title = "Chronos", breadcrumbs: breadcrumbsOverride, userProfile, onLogout } = Astro.props as Props;
+const { title = "Chronos", breadcrumbs: breadcrumbsOverride, userProfile } = Astro.props as Props;
 
 const currentPath = new URL(Astro.request.url).pathname;
 
 const breadcrumbs = breadcrumbsOverride ?? resolveBreadcrumbs(currentPath);
-
-const defaultLogout = () => Promise.resolve();
 ---
 
 <Layout title={title}>
   <div class="min-h-screen bg-slate-50 text-slate-900">
-    <Navbar
-      client:idle
-      navItems={navItems}
-      breadcrumbs={breadcrumbs}
-      userProfile={userProfile ?? null}
-      onLogout={onLogout ?? defaultLogout}
-    />
+    <Navbar client:idle navItems={navItems} breadcrumbs={breadcrumbs} userProfile={userProfile ?? null} />
     <main class="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-8">
       <slot />
     </main>

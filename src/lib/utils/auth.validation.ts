@@ -24,3 +24,9 @@ export const registerSchema = z
   });
 
 export type RegisterFormData = z.infer<typeof registerSchema>;
+
+export const forgotPasswordSchema = z.object({
+  email: z.string().trim().min(1, "E-mail jest wymagany").email("Nieprawidłowy format adresu e-mail"),
+});
+
+export type ForgotPasswordFormData = z.infer<typeof forgotPasswordSchema>;

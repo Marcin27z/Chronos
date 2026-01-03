@@ -23,3 +23,19 @@ export async function signUpWithEmailPassword(
     options: options?.emailRedirectTo ? { emailRedirectTo: options.emailRedirectTo } : undefined,
   });
 }
+
+export async function resetPasswordForEmail(
+  supabase: SupabaseServerClient,
+  email: string,
+  options?: { redirectTo?: string }
+): Promise<Awaited<ReturnType<SupabaseServerClient["auth"]["resetPasswordForEmail"]>>> {
+  return supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: options?.redirectTo,
+  });
+}
+
+export async function signOut(
+  supabase: SupabaseServerClient
+): Promise<Awaited<ReturnType<SupabaseServerClient["auth"]["signOut"]>>> {
+  return supabase.auth.signOut();
+}
