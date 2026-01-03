@@ -810,3 +810,879 @@ describe("TaskService.createTask", () => {
     });
   });
 });
+
+describe("TaskService.getTasks", () => {
+  const userId = "user-123";
+
+  interface SupabaseQueryResponse {
+    data?: TaskDTO[] | null;
+    error?: { message: string };
+  }
+
+  interface SupabaseCountResponse {
+    count?: number | null;
+    error?: { message: string };
+  }
+
+  const createMockSupabaseForGetTasks = (
+    tasksResponse: SupabaseQueryResponse,
+    countResponse: SupabaseCountResponse
+  ) => {
+    let callCount = 0;
+
+    // Mock for tasks query chain: from().select().eq().order().range()
+    const rangeMock = vi.fn().mockResolvedValue(tasksResponse);
+    const orderMock = vi.fn(() => ({ range: rangeMock }));
+    const eqMock = vi.fn(() => ({ order: orderMock }));
+    const selectMock = vi.fn(() => ({ eq: eqMock }));
+
+    // Mock for count query chain: from().select(..., { count: "exact", head: true }).eq()
+    const countEqMock = vi.fn().mockResolvedValue(countResponse);
+    const countSelectMock = vi.fn((columns: string, options?: { count: string; head: boolean }) => {
+      if (options?.head && options?.count === "exact") {
+        // Return chainable object that has .eq() method
+        return { eq: countEqMock };
+      }
+      return { eq: countEqMock };
+    });
+
+    const fromMock = vi.fn(() => {
+      callCount++;
+      if (callCount === 1) {
+        // First call: tasks query
+        return { select: selectMock };
+      } else {
+        // Second call: count query
+        return { select: countSelectMock };
+      }
+    });
+
+    const supabase = {
+      from: fromMock,
+    } as unknown as SupabaseServerClient;
+
+    return {
+      supabase,
+      fromMock,
+      selectMock,
+      eqMock,
+      orderMock,
+      rangeMock,
+      countSelectMock,
+      countEqMock,
+    };
+  };
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe("Happy path scenarios", () => {
+    it("retrieves tasks with default sort (next_due_date ascending) and pagination", async () => {
+      // Arrange
+      const tasks: TaskDTO[] = [
+        {
+          id: "task-1",
+          user_id: userId,
+          title: "Task 1",
+          description: null,
+          interval_value: 1,
+          interval_unit: "days",
+          preferred_day_of_week: null,
+          next_due_date: "2025-01-01",
+          last_action_date: null,
+          last_action_type: null,
+          created_at: "2025-01-01T00:00:00Z",
+          updated_at: "2025-01-01T00:00:00Z",
+        },
+        {
+          id: "task-2",
+          user_id: userId,
+          title: "Task 2",
+          description: null,
+          interval_value: 2,
+          interval_unit: "weeks",
+          preferred_day_of_week: null,
+          next_due_date: "2025-01-02",
+          last_action_date: null,
+          last_action_type: null,
+          created_at: "2025-01-01T00:00:00Z",
+          updated_at: "2025-01-01T00:00:00Z",
+        },
+      ];
+
+      const { supabase, eqMock, orderMock, rangeMock } = createMockSupabaseForGetTasks({ data: tasks }, { count: 2 });
+      const service = new TaskService(supabase);
+
+      // Act
+      const result = await service.getTasks(userId, "next_due_date", 10, 0);
+
+      // Assert
+      expect(result.data).toEqual(tasks);
+      expect(result.pagination).toEqual({
+        total: 2,
+        limit: 10,
+        offset: 0,
+        has_more: false,
+      });
+      expect(eqMock).toHaveBeenCalledWith("user_id", userId);
+      expect(orderMock).toHaveBeenCalledWith("next_due_date", { ascending: true });
+      expect(rangeMock).toHaveBeenCalledWith(0, 9);
+    });
+
+    it("retrieves tasks with descending sort by next_due_date", async () => {
+      // Arrange
+      const tasks: TaskDTO[] = [
+        {
+          id: "task-2",
+          user_id: userId,
+          title: "Task 2",
+          description: null,
+          interval_value: 2,
+          interval_unit: "weeks",
+          preferred_day_of_week: null,
+          next_due_date: "2025-01-02",
+          last_action_date: null,
+          last_action_type: null,
+          created_at: "2025-01-01T00:00:00Z",
+          updated_at: "2025-01-01T00:00:00Z",
+        },
+        {
+          id: "task-1",
+          user_id: userId,
+          title: "Task 1",
+          description: null,
+          interval_value: 1,
+          interval_unit: "days",
+          preferred_day_of_week: null,
+          next_due_date: "2025-01-01",
+          last_action_date: null,
+          last_action_type: null,
+          created_at: "2025-01-01T00:00:00Z",
+          updated_at: "2025-01-01T00:00:00Z",
+        },
+      ];
+
+      const { supabase, orderMock } = createMockSupabaseForGetTasks({ data: tasks }, { count: 2 });
+      const service = new TaskService(supabase);
+
+      // Act
+      const result = await service.getTasks(userId, "-next_due_date", 10, 0);
+
+      // Assert
+      expect(result.data).toEqual(tasks);
+      expect(orderMock).toHaveBeenCalledWith("next_due_date", { ascending: false });
+    });
+
+    it("retrieves tasks sorted by title ascending", async () => {
+      // Arrange
+      const tasks: TaskDTO[] = [
+        {
+          id: "task-1",
+          user_id: userId,
+          title: "Alpha Task",
+          description: null,
+          interval_value: 1,
+          interval_unit: "days",
+          preferred_day_of_week: null,
+          next_due_date: "2025-01-01",
+          last_action_date: null,
+          last_action_type: null,
+          created_at: "2025-01-01T00:00:00Z",
+          updated_at: "2025-01-01T00:00:00Z",
+        },
+        {
+          id: "task-2",
+          user_id: userId,
+          title: "Beta Task",
+          description: null,
+          interval_value: 2,
+          interval_unit: "weeks",
+          preferred_day_of_week: null,
+          next_due_date: "2025-01-02",
+          last_action_date: null,
+          last_action_type: null,
+          created_at: "2025-01-01T00:00:00Z",
+          updated_at: "2025-01-01T00:00:00Z",
+        },
+      ];
+
+      const { supabase, orderMock } = createMockSupabaseForGetTasks({ data: tasks }, { count: 2 });
+      const service = new TaskService(supabase);
+
+      // Act
+      const result = await service.getTasks(userId, "title", 10, 0);
+
+      // Assert
+      expect(result.data).toEqual(tasks);
+      expect(orderMock).toHaveBeenCalledWith("title", { ascending: true });
+    });
+
+    it("retrieves tasks sorted by title descending", async () => {
+      // Arrange
+      const tasks: TaskDTO[] = [
+        {
+          id: "task-2",
+          user_id: userId,
+          title: "Beta Task",
+          description: null,
+          interval_value: 2,
+          interval_unit: "weeks",
+          preferred_day_of_week: null,
+          next_due_date: "2025-01-02",
+          last_action_date: null,
+          last_action_type: null,
+          created_at: "2025-01-01T00:00:00Z",
+          updated_at: "2025-01-01T00:00:00Z",
+        },
+        {
+          id: "task-1",
+          user_id: userId,
+          title: "Alpha Task",
+          description: null,
+          interval_value: 1,
+          interval_unit: "days",
+          preferred_day_of_week: null,
+          next_due_date: "2025-01-01",
+          last_action_date: null,
+          last_action_type: null,
+          created_at: "2025-01-01T00:00:00Z",
+          updated_at: "2025-01-01T00:00:00Z",
+        },
+      ];
+
+      const { supabase, orderMock } = createMockSupabaseForGetTasks({ data: tasks }, { count: 2 });
+      const service = new TaskService(supabase);
+
+      // Act
+      const result = await service.getTasks(userId, "-title", 10, 0);
+
+      // Assert
+      expect(result.data).toEqual(tasks);
+      expect(orderMock).toHaveBeenCalledWith("title", { ascending: false });
+    });
+  });
+
+  describe("Pagination scenarios", () => {
+    it("handles pagination with limit and offset correctly", async () => {
+      // Arrange
+      const tasks: TaskDTO[] = [
+        {
+          id: "task-2",
+          user_id: userId,
+          title: "Task 2",
+          description: null,
+          interval_value: 2,
+          interval_unit: "weeks",
+          preferred_day_of_week: null,
+          next_due_date: "2025-01-02",
+          last_action_date: null,
+          last_action_type: null,
+          created_at: "2025-01-01T00:00:00Z",
+          updated_at: "2025-01-01T00:00:00Z",
+        },
+      ];
+
+      const { supabase, rangeMock } = createMockSupabaseForGetTasks({ data: tasks }, { count: 5 });
+      const service = new TaskService(supabase);
+
+      // Act
+      const result = await service.getTasks(userId, "next_due_date", 2, 1);
+
+      // Assert
+      expect(result.data).toEqual(tasks);
+      expect(result.pagination).toEqual({
+        total: 5,
+        limit: 2,
+        offset: 1,
+        has_more: true, // offset(1) + limit(2) = 3 < total(5)
+      });
+      expect(rangeMock).toHaveBeenCalledWith(1, 2); // offset to offset + limit - 1
+    });
+
+    it("calculates has_more as true when more items exist", async () => {
+      // Arrange
+      const tasks: TaskDTO[] = [
+        {
+          id: "task-1",
+          user_id: userId,
+          title: "Task 1",
+          description: null,
+          interval_value: 1,
+          interval_unit: "days",
+          preferred_day_of_week: null,
+          next_due_date: "2025-01-01",
+          last_action_date: null,
+          last_action_type: null,
+          created_at: "2025-01-01T00:00:00Z",
+          updated_at: "2025-01-01T00:00:00Z",
+        },
+      ];
+
+      const { supabase } = createMockSupabaseForGetTasks({ data: tasks }, { count: 10 });
+      const service = new TaskService(supabase);
+
+      // Act
+      const result = await service.getTasks(userId, "next_due_date", 5, 0);
+
+      // Assert
+      expect(result.pagination.has_more).toBe(true); // 0 + 5 = 5 < 10
+    });
+
+    it("calculates has_more as false when no more items exist", async () => {
+      // Arrange
+      const tasks: TaskDTO[] = [
+        {
+          id: "task-1",
+          user_id: userId,
+          title: "Task 1",
+          description: null,
+          interval_value: 1,
+          interval_unit: "days",
+          preferred_day_of_week: null,
+          next_due_date: "2025-01-01",
+          last_action_date: null,
+          last_action_type: null,
+          created_at: "2025-01-01T00:00:00Z",
+          updated_at: "2025-01-01T00:00:00Z",
+        },
+      ];
+
+      const { supabase } = createMockSupabaseForGetTasks({ data: tasks }, { count: 5 });
+      const service = new TaskService(supabase);
+
+      // Act
+      const result = await service.getTasks(userId, "next_due_date", 5, 0);
+
+      // Assert
+      expect(result.pagination.has_more).toBe(false); // 0 + 5 = 5, not < 5
+    });
+
+    it("calculates has_more as false when offset + limit equals total", async () => {
+      // Arrange
+      const tasks: TaskDTO[] = [
+        {
+          id: "task-3",
+          user_id: userId,
+          title: "Task 3",
+          description: null,
+          interval_value: 3,
+          interval_unit: "days",
+          preferred_day_of_week: null,
+          next_due_date: "2025-01-03",
+          last_action_date: null,
+          last_action_type: null,
+          created_at: "2025-01-01T00:00:00Z",
+          updated_at: "2025-01-01T00:00:00Z",
+        },
+      ];
+
+      const { supabase } = createMockSupabaseForGetTasks({ data: tasks }, { count: 10 });
+      const service = new TaskService(supabase);
+
+      // Act
+      const result = await service.getTasks(userId, "next_due_date", 5, 5);
+
+      // Assert
+      expect(result.pagination.has_more).toBe(false); // 5 + 5 = 10, not < 10
+    });
+
+    it("handles minimum limit value (1)", async () => {
+      // Arrange
+      const tasks: TaskDTO[] = [
+        {
+          id: "task-1",
+          user_id: userId,
+          title: "Task 1",
+          description: null,
+          interval_value: 1,
+          interval_unit: "days",
+          preferred_day_of_week: null,
+          next_due_date: "2025-01-01",
+          last_action_date: null,
+          last_action_type: null,
+          created_at: "2025-01-01T00:00:00Z",
+          updated_at: "2025-01-01T00:00:00Z",
+        },
+      ];
+
+      const { supabase, rangeMock } = createMockSupabaseForGetTasks({ data: tasks }, { count: 1 });
+      const service = new TaskService(supabase);
+
+      // Act
+      const result = await service.getTasks(userId, "next_due_date", 1, 0);
+
+      // Assert
+      expect(result.data).toHaveLength(1);
+      expect(result.pagination.limit).toBe(1);
+      expect(rangeMock).toHaveBeenCalledWith(0, 0); // offset to offset + limit - 1
+    });
+
+    it("handles maximum limit value (100)", async () => {
+      // Arrange
+      const tasks: TaskDTO[] = Array.from({ length: 100 }, (_, i) => ({
+        id: `task-${i + 1}`,
+        user_id: userId,
+        title: `Task ${i + 1}`,
+        description: null,
+        interval_value: 1,
+        interval_unit: "days",
+        preferred_day_of_week: null,
+        next_due_date: "2025-01-01",
+        last_action_date: null,
+        last_action_type: null,
+        created_at: "2025-01-01T00:00:00Z",
+        updated_at: "2025-01-01T00:00:00Z",
+      }));
+
+      const { supabase, rangeMock } = createMockSupabaseForGetTasks({ data: tasks }, { count: 100 });
+      const service = new TaskService(supabase);
+
+      // Act
+      const result = await service.getTasks(userId, "next_due_date", 100, 0);
+
+      // Assert
+      expect(result.data).toHaveLength(100);
+      expect(result.pagination.limit).toBe(100);
+      expect(rangeMock).toHaveBeenCalledWith(0, 99);
+    });
+
+    it("handles offset at boundary (last page)", async () => {
+      // Arrange
+      const tasks: TaskDTO[] = [
+        {
+          id: "task-10",
+          user_id: userId,
+          title: "Task 10",
+          description: null,
+          interval_value: 10,
+          interval_unit: "days",
+          preferred_day_of_week: null,
+          next_due_date: "2025-01-10",
+          last_action_date: null,
+          last_action_type: null,
+          created_at: "2025-01-01T00:00:00Z",
+          updated_at: "2025-01-01T00:00:00Z",
+        },
+      ];
+
+      const { supabase, rangeMock } = createMockSupabaseForGetTasks({ data: tasks }, { count: 10 });
+      const service = new TaskService(supabase);
+
+      // Act
+      const result = await service.getTasks(userId, "next_due_date", 5, 5);
+
+      // Assert
+      expect(result.data).toHaveLength(1);
+      expect(result.pagination.offset).toBe(5);
+      expect(rangeMock).toHaveBeenCalledWith(5, 9);
+    });
+  });
+
+  describe("Empty results scenarios", () => {
+    it("returns empty array when user has no tasks", async () => {
+      // Arrange
+      const { supabase } = createMockSupabaseForGetTasks({ data: [] }, { count: 0 });
+      const service = new TaskService(supabase);
+
+      // Act
+      const result = await service.getTasks(userId, "next_due_date", 10, 0);
+
+      // Assert
+      expect(result.data).toEqual([]);
+      expect(result.pagination).toEqual({
+        total: 0,
+        limit: 10,
+        offset: 0,
+        has_more: false,
+      });
+    });
+
+    it("returns empty array when data is null", async () => {
+      // Arrange
+      const { supabase } = createMockSupabaseForGetTasks({ data: null }, { count: 0 });
+      const service = new TaskService(supabase);
+
+      // Act
+      const result = await service.getTasks(userId, "next_due_date", 10, 0);
+
+      // Assert
+      expect(result.data).toEqual([]);
+      expect(result.pagination.total).toBe(0);
+    });
+
+    it("handles null count by defaulting to 0", async () => {
+      // Arrange
+      const tasks: TaskDTO[] = [
+        {
+          id: "task-1",
+          user_id: userId,
+          title: "Task 1",
+          description: null,
+          interval_value: 1,
+          interval_unit: "days",
+          preferred_day_of_week: null,
+          next_due_date: "2025-01-01",
+          last_action_date: null,
+          last_action_type: null,
+          created_at: "2025-01-01T00:00:00Z",
+          updated_at: "2025-01-01T00:00:00Z",
+        },
+      ];
+
+      const { supabase } = createMockSupabaseForGetTasks({ data: tasks }, { count: null });
+      const service = new TaskService(supabase);
+
+      // Act
+      const result = await service.getTasks(userId, "next_due_date", 10, 0);
+
+      // Assert
+      expect(result.pagination.total).toBe(0);
+      expect(result.pagination.has_more).toBe(false);
+    });
+  });
+
+  describe("User isolation", () => {
+    it("filters tasks by user_id to ensure user isolation", async () => {
+      // Arrange
+      const tasks: TaskDTO[] = [
+        {
+          id: "task-1",
+          user_id: userId,
+          title: "User's Task",
+          description: null,
+          interval_value: 1,
+          interval_unit: "days",
+          preferred_day_of_week: null,
+          next_due_date: "2025-01-01",
+          last_action_date: null,
+          last_action_type: null,
+          created_at: "2025-01-01T00:00:00Z",
+          updated_at: "2025-01-01T00:00:00Z",
+        },
+      ];
+
+      const { supabase, eqMock } = createMockSupabaseForGetTasks({ data: tasks }, { count: 1 });
+      const service = new TaskService(supabase);
+
+      // Act
+      await service.getTasks(userId, "next_due_date", 10, 0);
+
+      // Assert
+      expect(eqMock).toHaveBeenCalledWith("user_id", userId);
+    });
+
+    it("applies user_id filter to both tasks query and count query", async () => {
+      // Arrange
+      const tasks: TaskDTO[] = [
+        {
+          id: "task-1",
+          user_id: userId,
+          title: "Task 1",
+          description: null,
+          interval_value: 1,
+          interval_unit: "days",
+          preferred_day_of_week: null,
+          next_due_date: "2025-01-01",
+          last_action_date: null,
+          last_action_type: null,
+          created_at: "2025-01-01T00:00:00Z",
+          updated_at: "2025-01-01T00:00:00Z",
+        },
+      ];
+
+      const { supabase, eqMock } = createMockSupabaseForGetTasks({ data: tasks }, { count: 1 });
+      const service = new TaskService(supabase);
+
+      // Act
+      await service.getTasks(userId, "next_due_date", 10, 0);
+
+      // Assert
+      // eqMock should be called for both queries (tasks and count)
+      expect(eqMock).toHaveBeenCalledWith("user_id", userId);
+    });
+  });
+
+  describe("Sort parameter parsing", () => {
+    it("parses 'next_due_date' sort parameter correctly", async () => {
+      // Arrange
+      const tasks: TaskDTO[] = [];
+      const { supabase, orderMock } = createMockSupabaseForGetTasks({ data: tasks }, { count: 0 });
+      const service = new TaskService(supabase);
+
+      // Act
+      await service.getTasks(userId, "next_due_date", 10, 0);
+
+      // Assert
+      expect(orderMock).toHaveBeenCalledWith("next_due_date", { ascending: true });
+    });
+
+    it("parses '-next_due_date' sort parameter correctly", async () => {
+      // Arrange
+      const tasks: TaskDTO[] = [];
+      const { supabase, orderMock } = createMockSupabaseForGetTasks({ data: tasks }, { count: 0 });
+      const service = new TaskService(supabase);
+
+      // Act
+      await service.getTasks(userId, "-next_due_date", 10, 0);
+
+      // Assert
+      expect(orderMock).toHaveBeenCalledWith("next_due_date", { ascending: false });
+    });
+
+    it("parses 'title' sort parameter correctly", async () => {
+      // Arrange
+      const tasks: TaskDTO[] = [];
+      const { supabase, orderMock } = createMockSupabaseForGetTasks({ data: tasks }, { count: 0 });
+      const service = new TaskService(supabase);
+
+      // Act
+      await service.getTasks(userId, "title", 10, 0);
+
+      // Assert
+      expect(orderMock).toHaveBeenCalledWith("title", { ascending: true });
+    });
+
+    it("parses '-title' sort parameter correctly", async () => {
+      // Arrange
+      const tasks: TaskDTO[] = [];
+      const { supabase, orderMock } = createMockSupabaseForGetTasks({ data: tasks }, { count: 0 });
+      const service = new TaskService(supabase);
+
+      // Act
+      await service.getTasks(userId, "-title", 10, 0);
+
+      // Assert
+      expect(orderMock).toHaveBeenCalledWith("title", { ascending: false });
+    });
+  });
+
+  describe("Error handling", () => {
+    it("throws error with descriptive message when tasks query fails", async () => {
+      // Arrange
+      const errorMessage = "connection timeout";
+      const { supabase } = createMockSupabaseForGetTasks({ error: { message: errorMessage } }, { count: 0 });
+      const service = new TaskService(supabase);
+
+      // Act & Assert
+      await expect(service.getTasks(userId, "next_due_date", 10, 0)).rejects.toThrow(
+        `Failed to retrieve tasks: ${errorMessage}`
+      );
+    });
+
+    it("throws error with descriptive message when count query fails", async () => {
+      // Arrange
+      const tasks: TaskDTO[] = [
+        {
+          id: "task-1",
+          user_id: userId,
+          title: "Task 1",
+          description: null,
+          interval_value: 1,
+          interval_unit: "days",
+          preferred_day_of_week: null,
+          next_due_date: "2025-01-01",
+          last_action_date: null,
+          last_action_type: null,
+          created_at: "2025-01-01T00:00:00Z",
+          updated_at: "2025-01-01T00:00:00Z",
+        },
+      ];
+
+      const errorMessage = "database connection lost";
+      const { supabase } = createMockSupabaseForGetTasks({ data: tasks }, { error: { message: errorMessage } });
+      const service = new TaskService(supabase);
+
+      // Act & Assert
+      await expect(service.getTasks(userId, "next_due_date", 10, 0)).rejects.toThrow(
+        `Failed to count tasks: ${errorMessage}`
+      );
+    });
+
+    it("propagates error message from Supabase tasks query error", async () => {
+      // Arrange
+      const specificError = "permission denied for table tasks";
+      const { supabase } = createMockSupabaseForGetTasks({ error: { message: specificError } }, { count: 0 });
+      const service = new TaskService(supabase);
+
+      // Act & Assert
+      await expect(service.getTasks(userId, "next_due_date", 10, 0)).rejects.toThrow(specificError);
+    });
+
+    it("propagates error message from Supabase count query error", async () => {
+      // Arrange
+      const tasks: TaskDTO[] = [];
+      const specificError = "query execution timeout";
+      const { supabase } = createMockSupabaseForGetTasks({ data: tasks }, { error: { message: specificError } });
+      const service = new TaskService(supabase);
+
+      // Act & Assert
+      await expect(service.getTasks(userId, "next_due_date", 10, 0)).rejects.toThrow(specificError);
+    });
+  });
+
+  describe("Return value structure", () => {
+    it("returns TaskListDTO with correct structure", async () => {
+      // Arrange
+      const tasks: TaskDTO[] = [
+        {
+          id: "task-1",
+          user_id: userId,
+          title: "Task 1",
+          description: null,
+          interval_value: 1,
+          interval_unit: "days",
+          preferred_day_of_week: null,
+          next_due_date: "2025-01-01",
+          last_action_date: null,
+          last_action_type: null,
+          created_at: "2025-01-01T00:00:00Z",
+          updated_at: "2025-01-01T00:00:00Z",
+        },
+      ];
+
+      const { supabase } = createMockSupabaseForGetTasks({ data: tasks }, { count: 1 });
+      const service = new TaskService(supabase);
+
+      // Act
+      const result = await service.getTasks(userId, "next_due_date", 10, 0);
+
+      // Assert
+      expect(result).toHaveProperty("data");
+      expect(result).toHaveProperty("pagination");
+      expect(result.data).toBeInstanceOf(Array);
+      expect(result.pagination).toHaveProperty("total");
+      expect(result.pagination).toHaveProperty("limit");
+      expect(result.pagination).toHaveProperty("offset");
+      expect(result.pagination).toHaveProperty("has_more");
+    });
+
+    it("returns pagination metadata with all required fields", async () => {
+      // Arrange
+      const tasks: TaskDTO[] = [];
+      const { supabase } = createMockSupabaseForGetTasks({ data: tasks }, { count: 15 });
+      const service = new TaskService(supabase);
+
+      // Act
+      const result = await service.getTasks(userId, "next_due_date", 5, 10);
+
+      // Assert
+      expect(result.pagination).toEqual({
+        total: 15,
+        limit: 5,
+        offset: 10,
+        has_more: false, // 10 + 5 = 15, not < 15
+      });
+    });
+  });
+
+  describe("Edge cases and boundary conditions", () => {
+    it("handles offset of 0 correctly", async () => {
+      // Arrange
+      const tasks: TaskDTO[] = [
+        {
+          id: "task-1",
+          user_id: userId,
+          title: "Task 1",
+          description: null,
+          interval_value: 1,
+          interval_unit: "days",
+          preferred_day_of_week: null,
+          next_due_date: "2025-01-01",
+          last_action_date: null,
+          last_action_type: null,
+          created_at: "2025-01-01T00:00:00Z",
+          updated_at: "2025-01-01T00:00:00Z",
+        },
+      ];
+
+      const { supabase, rangeMock } = createMockSupabaseForGetTasks({ data: tasks }, { count: 1 });
+      const service = new TaskService(supabase);
+
+      // Act
+      const result = await service.getTasks(userId, "next_due_date", 10, 0);
+
+      // Assert
+      expect(result.pagination.offset).toBe(0);
+      expect(rangeMock).toHaveBeenCalledWith(0, 9);
+    });
+
+    it("handles large offset values correctly", async () => {
+      // Arrange
+      const tasks: TaskDTO[] = [];
+      const { supabase, rangeMock } = createMockSupabaseForGetTasks({ data: tasks }, { count: 1000 });
+      const service = new TaskService(supabase);
+
+      // Act
+      const result = await service.getTasks(userId, "next_due_date", 20, 500);
+
+      // Assert
+      expect(result.pagination.offset).toBe(500);
+      expect(rangeMock).toHaveBeenCalledWith(500, 519);
+    });
+
+    it("handles case when returned tasks count is less than limit", async () => {
+      // Arrange
+      const tasks: TaskDTO[] = [
+        {
+          id: "task-1",
+          user_id: userId,
+          title: "Task 1",
+          description: null,
+          interval_value: 1,
+          interval_unit: "days",
+          preferred_day_of_week: null,
+          next_due_date: "2025-01-01",
+          last_action_date: null,
+          last_action_type: null,
+          created_at: "2025-01-01T00:00:00Z",
+          updated_at: "2025-01-01T00:00:00Z",
+        },
+      ];
+
+      const { supabase } = createMockSupabaseForGetTasks({ data: tasks }, { count: 1 });
+      const service = new TaskService(supabase);
+
+      // Act
+      const result = await service.getTasks(userId, "next_due_date", 10, 0);
+
+      // Assert
+      expect(result.data).toHaveLength(1);
+      expect(result.pagination.limit).toBe(10);
+      expect(result.pagination.has_more).toBe(false);
+    });
+
+    it("handles tasks with all optional fields populated", async () => {
+      // Arrange
+      const tasks: TaskDTO[] = [
+        {
+          id: "task-1",
+          user_id: userId,
+          title: "Complete Task",
+          description: "Full description",
+          interval_value: 2,
+          interval_unit: "weeks",
+          preferred_day_of_week: 3,
+          next_due_date: "2025-01-15",
+          last_action_date: "2025-01-01",
+          last_action_type: "completed",
+          created_at: "2025-01-01T00:00:00Z",
+          updated_at: "2025-01-01T00:00:00Z",
+        },
+      ];
+
+      const { supabase } = createMockSupabaseForGetTasks({ data: tasks }, { count: 1 });
+      const service = new TaskService(supabase);
+
+      // Act
+      const result = await service.getTasks(userId, "next_due_date", 10, 0);
+
+      // Assert
+      expect(result.data[0]).toEqual(tasks[0]);
+      expect(result.data[0].description).toBe("Full description");
+      expect(result.data[0].preferred_day_of_week).toBe(3);
+      expect(result.data[0].last_action_date).toBe("2025-01-01");
+      expect(result.data[0].last_action_type).toBe("completed");
+    });
+  });
+});
